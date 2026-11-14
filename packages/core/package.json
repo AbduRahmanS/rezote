@@ -1,0 +1,26 @@
+{
+  "name": "@rezote/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Rezote skeleton: offline-first storage, encrypted sync, status, and UI shell",
+  "exports": {
+    ".": "./src/index.ts",
+    "./ui": "./src/ui/index.ts",
+    "./node": "./src/node.ts",
+    "./vite": {
+      "types": "./vite.d.mts",
+      "default": "./vite.mjs"
+    },
+    "./styles.css": "./src/ui/styles.css"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@preact/signals": "^2.11.4",
+    "idb": "^8.0.4",
+    "preact": "^10.29.8",
+    "valibot": "^1.5.0"
+  }
+}

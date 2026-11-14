@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Remind the agent of the money and weight rules when a projection changes",
+      "trigger": "PostFileSave",
+      "matcher": "apps/[^/]+/src/domain/project\\.ts$",
+      "action": {
+        "type": "agent",
+        "prompt": "A projection changed. Check: money is integer FCFA and weights integer grams; rounding happens once and is documented; cancelled items are excluded everywhere; the result does not depend on event order. If a rule was added, add a fast-check property for it in project.test.ts."
+      }
+    }
+  ]
+}

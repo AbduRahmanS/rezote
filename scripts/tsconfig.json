@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"]
+  },
+  "include": ["*.ts", "../apps/*/src/domain/*.ts", "../apps/*/src/env.d.ts"],
+  "exclude": ["../apps/*/src/domain/*.test.ts"]
+}

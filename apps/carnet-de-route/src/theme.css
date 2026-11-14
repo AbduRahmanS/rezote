@@ -1,0 +1,5 @@
+/* Carnet de route uses a teal accent so the two apps are easy to tell apart. */
+:root {
+  --accent: #2dd4bf;
+  --accent-text: #042f2a;
+}

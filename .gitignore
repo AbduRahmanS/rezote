@@ -1,0 +1,9 @@
+node_modules/
+dist/
+dev-dist/
+.wrangler/
+.env.local
+.env.*.local
+*.log
+.DS_Store
+# Do not ignore .kiro: the Kiroween rules require it in the repository.

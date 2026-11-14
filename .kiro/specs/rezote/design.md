@@ -103,43 +103,45 @@ Keys are stored in IndexedDB on the phone, in the same way the data is. Anyone w
 ## Skeleton API (`packages/core`)
 
 ```ts
-import { defineApp, writersOnly } from "@rezote/core";
+import { defineApp } from "@rezote/core";
 
-export const app = defineApp({
+export const carnetDeRoute = defineApp({
   name: "carnet-de-route",
   events: {
-    "route/entry.recorded": v.object({
-      entryId: v.string(),
-      // ...
-      position: v.optional(writersOnly(PositionSchema)),
-    }),
-    // ...
+    "route/entry.recorded": v.object({ entryId: v.string(), /* … */ position: v.optional(Position) }),
+    // …
   },
-  initial: emptyState,
-  project: (state, event) => nextState,   // pure function
+  writersOnly: { "route/entry.recorded": ["position"] },   // must be optional fields
+  project: (events) => view,   // pure function of the canonical event list
 });
 
-// Provided by the skeleton:
-app.emit(space, type, payload)      // validate, encrypt, store, queue, trigger sync
-app.state(space)                    // signal with the current projection
-app.status                          // signal: { online, syncing, pending, ignored, lastSyncAt, lastError }
-app.isGhost(eventId)                // true while the event is in the outbox
-app.createSpace()                   // generates keys on the phone, registers the space
-app.join(link) / app.links(space)   // { write, read }
-app.canWrite(space)
+// Provided by the runtime (createApp(def, { serverUrl })):
+app.emit(type, payload, space?)   // validate, encrypt, store + queue in one transaction, trigger sync
+app.view / app.events             // signals for the current space
+app.status / app.ghosts           // { online, syncing, pending, ignored, lastSyncAt, lastError }, outbox IDs
+app.isGhost(eventId)
+app.createSpace(label)            // keys generated on the phone; registered on the server at the next sync, so it works offline
+app.join(secrets) / app.links()   // { write, read }
+app.canWrite() / app.select() / app.leave()
+app.nextCounter(key)              // atomic per-phone counter (receipt numbers)
+app.getSetting() / app.setSetting()   // per-phone settings (role, GPS)
 ```
 
-Shared UI pieces: `<AppShell>` (header, status bar), `<GhostMark>`, `<ShareButton>` (Web Share API, with copy fallback), `<Confirm>`, `<NumberPad>`, and the formatters `formatFCFA()`, `formatKg()`, `parseKg()`, `formatDuration()`, `formatDate()`, `formatTime()`. All interface text lives in `messages.fr.ts` files (Requirement 5.1).
+The projection receives the whole event list instead of folding one event at a time. Apps index events in a first pass and compute in a second, which makes order independence easy to get right.
+
+Receipt counters are incremented atomically in their own IndexedDB transaction just before the weighing event is written. A crash in between can skip a number but never reuse one.
+
+Shared UI pieces: `<AppShell>` (header, status bar, menu with spaces, share links, and sync details), `<GhostMark>`, `<ShareButton>` (Web Share API, with copy fallback), `<NumberPad>`, `<Stat>`, `<Field>`, `askReason()` (native prompt for cancellation reasons), and the formatters `formatFCFA()`, `formatKg()`, `parseKg()`, `formatDuration()`, `formatDate()`, `formatTime()`.
 
 ## Sync protocol
 
 | Method | Path | Body / query | Response |
 |---|---|---|---|
-| `POST` | `/spaces` | `{ app, writeKeyHash }` | `{ space }` |
+| `POST` | `/spaces` | `{ id, app, writeKeyHash }` | `{ space }` (201; the same request again is accepted, another key gets 409) |
 | `POST` | `/spaces/:space/events` | `{ events: Envelope[] }`, max 500 events, max 256 KB, write key required | `{ accepted: string[], rejected: {id, reason}[] }` |
 | `GET` | `/spaces/:space/events` | `?after=<seq>&limit=500` | `{ events: Envelope[], cursor: number, more: boolean }` |
 
-The phone generates the space ID and keys and sends only `SHA-256(W)` when creating a space, so `W` never reaches the server except as a bearer token on writes. The server generates the space ID if the phone's proposed ID already exists.
+The phone generates the space ID and keys and sends only `SHA-256(W)` when creating a space, so `W` never reaches the server except as a bearer token on writes. A 128-bit random ID makes collisions practically impossible; the server refuses to re-register an existing ID with another key.
 
 Client sync cycle:
 

@@ -76,7 +76,7 @@ The interface is in French. Amounts are in FCFA (XOF), which has no subunits. Se
 
 #### Acceptance criteria
 
-1. THE system SHALL provide all interface text in French, kept in one messages file per package so that another language can be added later.
+1. THE system SHALL provide all interface text in French. (Adding another language later requires extracting the strings from the screens into a messages file.)
 2. THE system SHALL display amounts as whole FCFA with a space as thousands separator (for example `10 000 FCFA`).
 3. THE system SHALL display weights in kg with at most one decimal and a comma as decimal separator (for example `84,5 kg`), and accept both comma and dot when the user types a weight.
 4. THE system SHALL display dates as `14/11/2026` and times in 24-hour format (`17:45`).
