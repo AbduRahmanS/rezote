@@ -2,20 +2,17 @@
 
 ## Overview
 
-Rezote is an npm-workspaces monorepo with one shared skeleton package, two apps built on it, and one small sync server.
+Rezote is an npm-workspaces monorepo with the skeleton, a framework-free sync API, and two TanStack Start apps. Each app deploys as one Cloudflare Worker that serves the app and its own sync API under `/api`; both Workers share one D1 database.
 
 ```
 rezote/
 ├── .kiro/                    specs, steering, hooks (required by the rules)
-├── packages/core/            the skeleton: events, crypto, storage, outbox, sync, status, sharing, UI shell
+├── packages/core/            the skeleton: events, crypto, storage, outbox, sync, runtime, formats; react/ UI shell
+├── packages/sync-api/        sync API handlers (Request → Response) and D1 migrations
 ├── apps/collecte/            app 1: cooperative cotton weighing and payments
 ├── apps/carnet-de-route/     app 2: truck trip log
-├── server/                   sync server (Hono on Cloudflare Workers + D1)
-├── scripts/                  size budget check, demo data
-├── docs/
-│   ├── research.md           background facts and sources
-│   ├── new-app.md            guide: build a third app on the skeleton
-│   └── deploy.md             deployment steps (done by the project owner)
+├── scripts/                  size budget, offline service worker, icons, demo data
+├── docs/                     research, deployment, guide for a third app
 ├── LICENSE                   MIT
 └── README.md
 ```
@@ -27,15 +24,19 @@ The core idea is event sourcing. Apps never update or delete rows. Every user ac
 | Concern | Choice | Why | Rejected alternative |
 |---|---|---|---|
 | Language | TypeScript (strict) | Typed event schemas | Plain JS |
-| UI | Preact + `@preact/signals` | About 5 KB gzip, React-style API | React (about 45 KB) |
-| Build | Vite | Simple multi-app setup | Webpack |
-| Local storage | IndexedDB via `idb` | Works offline, large quota, about 1 KB wrapper | localStorage (5 MB limit, synchronous) |
-| Offline shell | `vite-plugin-pwa` (Workbox precache) | Standard service worker generation | Hand-written service worker |
-| Validation | `valibot` | Tree-shakable, small | `zod` (about 13 KB gzip) |
-| Encryption | Web Crypto API (AES-GCM, HKDF, SHA-256) | Built into browsers and Workers, adds 0 KB | libsodium (about 100 KB) |
-| Sync server | Hono on Cloudflare Workers, D1 (SQLite) | Free tier without a credit card, tiny code | Supabase or Firebase (client SDK adds weight, and the server would need to read the data) |
-| Hosting (apps) | Cloudflare Pages | Same account as the server | GitHub Pages (fallback) |
-| Tests | Vitest + `fast-check` + `fake-indexeddb` | Unit and property-based tests in one runner | Jest |
+| Framework | TanStack Start (React 19), SPA mode | Type-safe routing and server routes in one framework; deploys to Cloudflare Workers; SPA mode because data lives on the phone | Preact + Vite (first version: smaller, but no framework-level routing, forms, or server routes) |
+| Routing | TanStack Router, file-based | Typed params and Zod-validated search params | Hash router (first version) |
+| Forms | TanStack Form + Zod | Field-level validation with the same schema library as the events | Hand-written forms |
+| Client state | TanStack Store | Fine-grained subscriptions from React (`useSelector`) | Preact signals (first version) |
+| Server data | none (no TanStack Query) | Screens read from the phone; the sync engine owns network calls | TanStack Query would only wrap two calls |
+| Offline data layer | own event store + sync engine | Immutable, end-to-end-encrypted events with tested guarantees | TanStack DB offline transactions: release candidate, mutable-row model |
+| Validation | Zod 4 | Event schemas and form validators | valibot (first version) |
+| Local storage | IndexedDB via `idb` | Works offline, large quota | localStorage (5 MB limit, synchronous) |
+| Offline shell | Service worker generated after the build (`scripts/build-sw.mjs`) | Must include the prerendered `/_shell.html`, written after the client build; small and explicit | `vite-plugin-pwa` (conflicting Babel peer dependencies with the React plugin, and runs before the shell exists) |
+| Encryption | Web Crypto API | Built into browsers and Workers, adds 0 KB | libsodium (about 100 KB) |
+| Sync API | `packages/sync-api` mounted in a Start server route | Same origin (no CORS), one deploy per app, framework-free and unit-tested | Separate Hono Worker (first version) |
+| Database | Cloudflare D1 | Free tier, SQLite | Supabase or Firebase |
+| Tests | Vitest + fast-check + fake-indexeddb + `node:sqlite` | Unit and property-based tests in one runner; real SQL without Cloudflare tooling | Jest |
 
 ## Data model
 
@@ -151,7 +152,7 @@ Client sync cycle:
 
 Triggers: the browser `online` event, app start, every 30 s while online, and right after `emit`. Network errors and 5xx responses back off at 2, 4, 8 seconds and so on, capped at 5 minutes (Requirement 2.4).
 
-Server storage (D1):
+Server storage (D1, `packages/sync-api/migrations`):
 
 ```sql
 CREATE TABLE spaces (
@@ -172,7 +173,7 @@ CREATE INDEX events_space_seq ON events(space, seq);
 
 Inserts use `ON CONFLICT(id) DO NOTHING`, so re-sending is harmless (Requirement 2.5). All queries are parameterized.
 
-Server checks (Requirement 7.5): space exists; write key matches; envelope shape (UUID `id`, `space` equal to the URL, numeric `ts`, `device` up to 64 chars, `iv` 16 chars, `ct` up to 16 KB); request size and count limits. CORS allows only the two app origins. Cloudflare's rate limiting binding limits each IP to 60 write requests per minute. The server cannot validate payloads because it cannot read them; phones validate on receipt.
+Server checks (Requirement 7.5): space exists and belongs to this Worker's app (Requirement 7.6b); write key matches; envelope shape (UUID `id`, `space` equal to the URL, numeric `ts`, `device` up to 64 chars, `iv` 16 chars, `ct` up to 16 KB); request size and count limits. The API is on the same origin as the app, so no CORS is configured. Cloudflare's rate limiting binding limits each IP to 60 write requests per minute. The server cannot validate payloads because it cannot read them; phones validate on receipt.
 
 ## App 1: Collecte
 
@@ -322,7 +323,7 @@ The write links for the demo spaces go in the Devpost testing instructions. The 
 
 ## Size budget
 
-`scripts/check-size.ts` runs after each app build. It gzips every file the service worker precaches and fails above 150 KB (Requirements 4.1, 4.4). The expected size is 35 to 50 KB per app.
+`scripts/check-size.mjs` gzips every file of each app's client build and fails above 250 KB (Requirements 4.1, 4.4). Measured: about 180 KB per app (React, TanStack Router, Form, Store, and Zod).
 
 ## Testing strategy
 
@@ -344,7 +345,7 @@ Property-based tests with `fast-check` cover the logic where a bug would corrupt
 | Time stopped is never negative | carnet-de-route |
 | `parseKg(formatKg(g)) = g` and `formatFCFA` output parses back to the original integer | core |
 
-Example-based tests cover receipts and summaries, server routes (Hono test client with a local D1 through Miniflare), permissions (read link cannot write), and the share links.
+Example-based tests cover receipts and summaries, the sync API (real SQL on `node:sqlite` through a small D1 shim), permissions (read link cannot write), app isolation, and the share links.
 
 ## How Kiro is used
 
@@ -352,7 +353,7 @@ Example-based tests cover receipts and summaries, server routes (Hono test clien
 - **Steering:** `product.md` (users, context, tone, French text), `tech.md` (stack, size budget, no third-party scripts, integer money and weights, encryption rules), `structure.md` (where code goes; core stays app-agnostic).
 - **Hooks:** run related tests when a file in `packages/core` or an app's `domain` folder is saved; run the size check after a build.
 - **Property-based tests:** the properties listed above.
-- **MCP:** Context7 for current documentation of Hono, D1, Workbox, and Preact.
+- **MCP:** Context7 for current documentation of TanStack Start, Router, Form, Store, Zod, and Cloudflare Workers.
 
 ## Open questions
 

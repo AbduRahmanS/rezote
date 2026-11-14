@@ -1,35 +1,18 @@
 # Building a third app on Rezote
 
-This guide builds a small app, **Puits** (well repairs), to show what you write and what the skeleton does for you. You write the event schemas, a pure projection, and the screens. The skeleton handles local storage, encryption, the outbox, sync, ghosts, share links, and the offline app shell.
+This guide builds a small app, **Puits** (well repairs), to show what you write and what the skeleton does for you. You write Zod event schemas, a pure projection, and TanStack Router screens. The skeleton handles local storage, encryption, the outbox, sync, ghosts, share links, the sync API, and the offline app shell.
 
-## 1. Create the package
+## 1. Copy an app folder
 
-```
-apps/puits/
-├── index.html            copy from apps/collecte and change the title
-├── package.json          copy from apps/collecte, rename to @rezote/puits
-├── tsconfig.json         copy from apps/collecte
-├── vite.config.ts
-└── src/
-    ├── domain/events.ts
-    ├── domain/project.ts
-    ├── domain/project.test.ts
-    ├── domain/app.ts
-    ├── runtime.ts
-    ├── ui.tsx
-    └── main.tsx
-```
+Copy `apps/carnet-de-route` to `apps/puits`, then:
 
-`vite.config.ts`:
-
-```ts
-import { rezoteConfig } from "@rezote/core/vite";
-import { defineConfig } from "vite";
-
-export default defineConfig(rezoteConfig({ name: "Puits · Rezote", shortName: "Puits", description: "Pannes de forages", port: 5175 }));
-```
-
-Add `"puits"` to the `APPS` set in `server/src/index.ts`, add the app to `scripts/make-icons.mjs`, and run `npm install` and `npm run icons`.
+- `package.json`: rename to `@rezote/puits`.
+- `wrangler.jsonc`: set `"name": "rezote-puits"` (keep the same D1 database and migrations).
+- `vite.config.ts`: pick a free port, for example `rezoteConfig({ port: 5175 })`.
+- `src/routes/api/$.ts`: `createSyncApi({ apps: ["puits"] })`. The API only serves spaces created by this app.
+- `public/manifest.webmanifest` and `src/routes/__root.tsx`: change the name, description, and title.
+- Delete `src/domain`, `src/components`, and the screens under `src/routes/_app`; you will write your own.
+- Add `puits` to `scripts/make-icons.mjs`, then run `npm install` and `npm run icons`.
 
 ## 2. Declare the events
 
@@ -37,15 +20,15 @@ Events are facts that happened. They are never changed or deleted; a correction 
 
 ```ts
 // src/domain/events.ts
-import * as v from "valibot";
+import { z } from "zod";
 
-const id = v.pipe(v.string(), v.minLength(1), v.maxLength(64));
-const at = v.pipe(v.number(), v.integer());
+const id = z.string().min(1).max(64);
+const at = z.number().int();
 
 export const events = {
-  "puits/breakdown.reported": v.object({ breakdownId: id, village: v.pipe(v.string(), v.maxLength(60)), note: v.optional(v.string()), at }),
-  "puits/repair.done": v.object({ breakdownId: id, technician: v.string(), cost: v.pipe(v.number(), v.integer(), v.minValue(0)), at }),
-  "puits/item.cancelled": v.object({ itemId: id, reason: v.string() }),
+  "puits/breakdown.reported": z.object({ breakdownId: id, village: z.string().trim().min(1).max(60), note: z.string().max(300).optional(), at }),
+  "puits/repair.done": z.object({ breakdownId: id, technician: z.string().min(1), cost: z.number().int().min(0), at }),
+  "puits/item.cancelled": z.object({ itemId: id, reason: z.string().min(1) }),
 };
 export type PuitsEvents = typeof events;
 ```
@@ -101,51 +84,60 @@ export const puits = defineApp({ name: "puits", events, project });
 
 // src/runtime.ts
 import { createApp } from "@rezote/core";
+import { useAppView } from "@rezote/core/react";
 import { puits } from "./domain/app.ts";
-export const app = createApp(puits, { serverUrl: import.meta.env.VITE_SYNC_URL ?? "http://localhost:8787" });
+export const app = createApp(puits); // talks to /api on the same origin
+export const useView = () => useAppView(app)!;
 ```
+
+The root route (`src/routes/__root.tsx`) wraps every page in `<AppShell app={app} appName="Puits">`, which opens storage, joins a space from a share link, starts sync, and shows the status bar and menu.
 
 ## 6. Write the screens
 
 ```tsx
-// src/ui.tsx
-import { navigate } from "@rezote/core";
-import { AppShell, GhostMark } from "@rezote/core/ui";
-import { app } from "./runtime.ts";
+// src/routes/_app/index.tsx
+import { act, GhostMark } from "@rezote/core/react";
+import { createFileRoute } from "@tanstack/react-router";
+import { app, useView } from "../../runtime.ts";
 
-export function App() {
-  if (!app.ready.value) return null;
-  const view = app.view.value;
+export const Route = createFileRoute("/_app/")({ component: Open });
+
+function Open() {
+  const view = useView();
+  const report = () =>
+    act(() => app.emit("puits/breakdown.reported", { breakdownId: crypto.randomUUID(), village: "Kignan", at: Date.now() }));
   return (
-    <AppShell app={app} appName="Puits" onNew={() => navigate("new")}>
-      {!app.currentId.value ? (
-        <button class="btn primary" onClick={() => app.createSpace("Forages de Kignan")}>Créer</button>
-      ) : (
-        <ul class="list">
-          {view?.open.map((b) => (
-            <li key={b.id} class="row">
-              {b.village}
-              <GhostMark app={app} id={b.eventId} />
-            </li>
-          ))}
-        </ul>
-      )}
-    </AppShell>
+    <div>
+      <button className="btn primary" onClick={report}>Signaler une panne</button>
+      <ul className="list">
+        {view.open.map((b) => (
+          <li key={b.id} className="row">
+            {b.village}
+            <GhostMark app={app} id={b.eventId} />
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 ```
 
-To record something, call `app.emit("puits/breakdown.reported", { … })`. It validates the payload, encrypts it, saves it on the phone, queues it, and starts a sync. The view updates immediately, and the record shows a 👻 until the server confirms it.
+`app.emit` validates the payload with Zod, encrypts it, saves it on the phone, queues it, and starts a sync. The view updates immediately, and the record shows a 👻 until the server confirms it. Use TanStack Form with Zod validators for anything longer than one field, as in `apps/carnet-de-route/src/routes/_app/start.tsx`.
 
-`main.tsx` is the same as in the other apps: import `@rezote/core/styles.css`, call `app.init()`, then render `<App />`.
+## 7. Build and deploy
+
+```bash
+npm run build -w @rezote/puits     # vite build + offline service worker
+npm run deploy -w @rezote/puits    # one Worker: app + /api
+```
 
 ## What you get for free
 
 | Feature | Where |
 |---|---|
-| Works offline, including the first screen after a reload | `vite.mjs` (Workbox precache), `storage.ts` |
-| Outbox with retry and backoff, idempotent server | `sync.ts`, `server/src/index.ts` |
-| End-to-end encryption, write and read links | `crypto.ts`, `links.ts` |
-| Status bar, ghosts, space menu, share panel | `ui/shell.tsx`, `ui/widgets.tsx` |
-| French formats for FCFA, kg, liters, dates | `format.ts` |
+| Works offline, including the first screen after a reload | `scripts/build-sw.mjs`, `packages/core/src/storage.ts` |
+| Outbox with retry and backoff, idempotent server | `packages/core/src/sync.ts`, `packages/sync-api` |
+| End-to-end encryption, write and read links | `packages/core/src/crypto.ts`, `links.ts` |
+| Status bar, ghosts, space menu, share panel | `packages/core/src/react` |
+| French formats for FCFA, kg, liters, dates | `packages/core/src/format.ts` |
 | Size budget in CI | `scripts/check-size.mjs` |

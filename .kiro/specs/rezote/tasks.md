@@ -75,6 +75,16 @@ The submission deadline is December 4, 2026, 2:00 pm Pacific Time. Each task lis
   - Hooks: related tests on save; size check after build
   - _Requirements: 4.1, 4.2, 4.4_
 
+## Migration to TanStack Start (Nov 14)
+
+- [x] 17. Move to TanStack Start, React 19, TanStack Router, Form, Store, and Zod
+  - Skeleton runtime and sync status on TanStack Store; React UI shell; Zod schemas
+  - Sync API extracted to `packages/sync-api` and mounted in each app's Worker (`/api/$`), with per-app isolation
+  - Offline service worker generated from the prerendered SPA shell; CSP hashes for inline bootstrap scripts
+  - Size budget raised to 250 KB
+  - Same tests (58) and end-to-end checks (29) passing
+  - _Requirements: 1.4, 4.1, 7.5, 7.6b, 10.4_
+
 ## Verification done
 
 - 58 unit and property-based tests (`npm test`), typecheck and lint clean.
@@ -90,11 +100,11 @@ The submission deadline is December 4, 2026, 2:00 pm Pacific Time. Each task lis
 - [x] 14. Documentation
   - `README.md`: problem, setup, architecture diagram, encryption and its limitations, demo links, how Kiro was used
   - `docs/new-app.md`: build a third app on the skeleton
-  - `docs/deploy.md`: Cloudflare account, D1 database, Worker, Pages, environment variables
+  - `docs/deploy.md`: Cloudflare account, D1 database, deploying both app Workers, demo seed
   - _Requirements: 6.4, 7.8, 10.5_
 
 - [ ] 15. Deployment (done by you, following `docs/deploy.md`)
-  - Sync server on Cloudflare Workers with D1; both apps on Cloudflare Pages
+  - One D1 database; both apps deployed as Cloudflare Workers (app + /api) with `npm run deploy -w <app>`
   - Run the demo seed against the deployed server
   - Manual test on two real phones: airplane mode, record data, reconnect, check the other phone
   - _Requirements: 1.4, 10.4_

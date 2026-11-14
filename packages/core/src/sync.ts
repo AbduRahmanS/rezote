@@ -5,7 +5,7 @@
 // 5xx responses back off at 2, 4, 8 s and so on, capped at 5 minutes. Events the
 // server refuses with another 4xx are moved to "rejected" and not retried.
 
-import { signal } from "@preact/signals";
+import { Store } from "@tanstack/store";
 import type { Envelope, RezoteEvent } from "./event.ts";
 import type { Storage } from "./storage.ts";
 
@@ -109,8 +109,10 @@ export interface SyncDeps {
 }
 
 export class SyncEngine {
-  readonly status = signal<SyncStatus>({ online: true, syncing: false, pending: 0, ignored: 0 });
-  readonly ghosts = signal<ReadonlySet<string>>(new Set());
+  /** Connection state and counters, for the status bar. */
+  readonly status = new Store<SyncStatus>({ online: true, syncing: false, pending: 0, ignored: 0 });
+  /** IDs of local events still in the outbox (shown as 👻). */
+  readonly ghosts = new Store<ReadonlySet<string>>(new Set<string>());
 
   private running: Promise<void> | null = null;
   private again = false;
@@ -126,19 +128,22 @@ export class SyncEngine {
   }
 
   private online(): boolean {
-    return this.deps.isOnline?.() ?? (typeof navigator === "undefined" ? true : navigator.onLine);
+    if (this.deps.isOnline) return this.deps.isOnline();
+    const nav = (globalThis as { navigator?: { onLine?: boolean } }).navigator;
+    return nav?.onLine ?? true;
   }
 
   /** Starts automatic sync: on the browser "online" event and every 30 s. */
   start(): void {
     this.patch({ online: this.online() });
-    if (typeof window !== "undefined") {
-      window.addEventListener("online", () => {
+    const win = globalThis as { addEventListener?: (type: string, fn: () => void) => void };
+    if (win.addEventListener) {
+      win.addEventListener("online", () => {
         this.patch({ online: true });
         this.retryAt = 0;
         this.trigger();
       });
-      window.addEventListener("offline", () => this.patch({ online: false }));
+      win.addEventListener("offline", () => this.patch({ online: false }));
     }
     this.interval = setInterval(() => this.trigger(), POLL_INTERVAL_MS);
     void this.refreshGhosts();
@@ -179,12 +184,12 @@ export class SyncEngine {
 
   async refreshGhosts(): Promise<void> {
     const ids = await this.deps.storage.outboxIds();
-    this.ghosts.value = ids;
+    this.ghosts.setState(() => ids);
     this.patch({ pending: ids.size });
   }
 
   private patch(p: Partial<SyncStatus>): void {
-    this.status.value = { ...this.status.value, ...p };
+    this.status.setState((prev) => ({ ...prev, ...p }));
   }
 
   private async runCycle(): Promise<void> {
@@ -271,7 +276,7 @@ export class SyncEngine {
         const key = `ignored:${space.id}`;
         const total = ((await storage.getMeta<number>(key)) ?? 0) + ignored;
         await storage.setMeta(key, total);
-        this.patch({ ignored: this.status.value.ignored + ignored });
+        this.patch({ ignored: this.status.get().ignored + ignored });
       }
       cursor = page.cursor;
       await storage.setMeta(cursorKey, cursor);

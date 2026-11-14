@@ -4,7 +4,7 @@
     {
       "name": "Run unit and property tests when skeleton or domain code is saved",
       "trigger": "PostFileSave",
-      "matcher": "(packages/core/(src|test)/.*\\.tsx?$)|(apps/[^/]+/src/domain/.*\\.ts$)|(server/(src|test)/.*\\.ts$)",
+      "matcher": "(packages/core/(src|test)/.*\\.tsx?$)|(apps/[^/]+/src/domain/.*\\.ts$)|(packages/sync-api/(src|test)/.*\\.ts$)",
       "action": {
         "type": "command",
         "command": "npx vitest --run --reporter=dot 2>&1 | tail -n 25"
