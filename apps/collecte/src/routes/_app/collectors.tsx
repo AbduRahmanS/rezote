@@ -1,6 +1,10 @@
-import { act, BackLink, Empty, Field, GhostMark, useCanWrite, useGhosts } from "@rezote/core/react";
+import { act, Empty, Field, GhostMark, List, ListItem, PageHeader, useCanWrite, useGhosts } from "@rezote/core/react";
+import { Badge } from "@rezote/ui/components/badge";
+import { Button } from "@rezote/ui/components/button";
+import { Input } from "@rezote/ui/components/input";
 import { useForm } from "@tanstack/react-form";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { UserRound } from "lucide-react";
 import { z } from "zod";
 import { COLLECTOR_CODE } from "../../domain/events.ts";
 import { app, newId, useView } from "../../runtime.ts";
@@ -20,7 +24,7 @@ function Collectors() {
     defaultValues: { name: "", code: "" },
     onSubmit: async ({ value, formApi }) => {
       const code = (value.code || suggested).toUpperCase();
-      const ok = await act(() => app.emit("collecte/collector.added", { collectorId: newId(), name: value.name, code }));
+      const ok = await act(() => app.emit("collecte/collector.added", { collectorId: newId(), name: value.name, code }), `${value.name} ajouté (${code})`);
       if (ok) formApi.reset();
     },
   });
@@ -33,59 +37,72 @@ function Collectors() {
 
   return (
     <div>
-      <BackLink />
-      <h1>Collecteurs</h1>
-      <p className="muted">
-        Chaque collecteur a un code. Les numéros de reçu commencent par ce code (par exemple K2-0042), donc ils ne se répètent jamais d'un
-        téléphone à l'autre.
-      </p>
-      <ul className="list">
-        {view.collectors.map((c) => (
-          <li key={c.id}>
-            <div className={`row ${ghosts.has(c.eventId) ? "is-ghost" : ""}`}>
-              <span className="row-title">
-                {c.name}
-                <GhostMark app={app} id={c.eventId} />
-              </span>
-              <span className={c.duplicateCode ? "bad" : "muted"}>{c.duplicateCode ? `${c.code} (doublon)` : c.code}</span>
-            </div>
-          </li>
-        ))}
-      </ul>
-      {view.collectors.length === 0 && <Empty>Ajoutez au moins un collecteur, puis envoyez-lui le lien d'écriture (menu ☰ → Partager).</Empty>}
+      <PageHeader
+        title="Collecteurs"
+        back={{ to: "/" }}
+        description="Chaque reçu commence par le code du collecteur (K2-0042) : les numéros ne se répètent jamais d'un téléphone à l'autre."
+      />
+      {view.collectors.length === 0 ? (
+        <Empty icon={UserRound}>Ajoutez au moins un collecteur, puis envoyez-lui le lien d'écriture (en haut, nom de la campagne → Partager).</Empty>
+      ) : (
+        <List>
+          {view.collectors.map((c) => (
+            <li key={c.id}>
+              <ListItem
+                icon={UserRound}
+                className={ghosts.has(c.eventId) ? "pending" : ""}
+                title={
+                  <>
+                    {c.name}
+                    <GhostMark app={app} id={c.eventId} compact />
+                  </>
+                }
+                end={
+                  c.duplicateCode ? (
+                    <Badge variant="destructive">{c.code} en double</Badge>
+                  ) : (
+                    <Badge variant="secondary" className="font-mono">
+                      {c.code}
+                    </Badge>
+                  )
+                }
+              />
+            </li>
+          ))}
+        </List>
+      )}
+
       {writable && (
         <form
-          className="card"
+          className="mt-4 grid gap-3 rounded-lg border bg-card p-3"
           onSubmit={(e) => {
             e.preventDefault();
             void form.handleSubmit();
           }}
         >
-          <h2>Ajouter un collecteur</h2>
-          <div className="inline">
+          <h2 className="text-sm font-semibold">Ajouter un collecteur</h2>
+          <div className="grid grid-cols-[1fr_5.5rem] gap-2">
             <form.Field name="name" validators={{ onSubmit: z.string().trim().min(1, "Le nom est obligatoire").max(60) }}>
               {(field) => (
                 <Field label="Nom" errors={field.state.meta.errors}>
-                  <input value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} placeholder="Adama Koné" />
+                  <Input value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} placeholder="Adama Koné" />
                 </Field>
               )}
             </form.Field>
             <form.Field name="code" validators={{ onChange: codeSchema }}>
               {(field) => (
                 <Field label="Code" errors={field.state.meta.errors}>
-                  <input maxLength={4} value={field.state.value} placeholder={suggested} onChange={(e) => field.handleChange(e.target.value.toUpperCase())} />
+                  <Input className="font-mono uppercase" maxLength={4} value={field.state.value} placeholder={suggested} onChange={(e) => field.handleChange(e.target.value.toUpperCase())} />
                 </Field>
               )}
             </form.Field>
           </div>
-          <button type="submit" className="btn primary block">
-            Ajouter
-          </button>
+          <Button type="submit">Ajouter</Button>
         </form>
       )}
-      <Link className="btn block" to="/">
-        Terminé
-      </Link>
+      <Button asChild variant="ghost" className="mt-3 w-full">
+        <Link to="/">Terminé</Link>
+      </Button>
     </div>
   );
 }

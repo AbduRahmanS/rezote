@@ -1,0 +1,15 @@
+@import "@rezote/ui/globals.css";
+@source "./";
+
+/* Carnet de route: road-sign blue. */
+:root {
+  --primary: oklch(0.45 0.14 258);
+  --primary-foreground: oklch(0.985 0.01 258);
+  --ring: oklch(0.45 0.14 258 / 0.45);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: oklch(0.74 0.12 255);
+    --primary-foreground: oklch(0.2 0.04 258);
+  }
+}

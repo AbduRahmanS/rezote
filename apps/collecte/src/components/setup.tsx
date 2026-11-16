@@ -1,29 +1,55 @@
-import { useStatus } from "@rezote/core/react";
+import { Empty, List, ListItem, PageHeader, useStatus } from "@rezote/core/react";
+import { Button } from "@rezote/ui/components/button";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { ChevronRight, CloudOff, Eye, Landmark, Scale, UserRound } from "lucide-react";
 import { app, setRole, useView, type Role } from "../runtime.ts";
+
+const steps = [
+  ["Le trésorier crée la campagne", "Produit, qualités et prix d'achat, puis il envoie un lien à chaque collecteur par WhatsApp."],
+  ["Les collecteurs pèsent au village", "Bâche par bâche, avec le cumul comme dans les cahiers. Le reçu part au producteur par SMS ou WhatsApp."],
+  ["Les pesées arrivent chez le trésorier", "Dès qu'un téléphone retrouve du réseau. Rien n'est perdu entre-temps."],
+];
 
 export function Welcome() {
   return (
     <div>
-      <div className="hero">
-        <div className="big">⚖️</div>
-        <h1>Collecte</h1>
-        <p className="muted">La pesée du coton au village, même sans réseau.</p>
+      <div className="mb-6 flex items-center gap-3">
+        <span className="flex size-11 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+          <Scale className="size-5" aria-hidden />
+        </span>
+        <div>
+          <h1 className="text-xl font-semibold">Collecte</h1>
+          <p className="text-sm text-muted-foreground">La pesée du coton au village, même sans réseau.</p>
+        </div>
       </div>
-      <div className="card">
-        <h2>Vous êtes trésorier de la coopérative ?</h2>
-        <p>Créez la campagne, puis envoyez le lien aux collecteurs par WhatsApp.</p>
-        <Link to="/new" className="btn primary block">
-          Créer une campagne
-        </Link>
+
+      <div className="grid gap-3">
+        <div className="rounded-lg border bg-card p-4">
+          <h2 className="font-semibold">Vous êtes trésorier de la coopérative ?</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Créez la campagne de cette saison.</p>
+          <Button asChild className="mt-3 w-full" size="lg">
+            <Link to="/new">Créer une campagne</Link>
+          </Button>
+        </div>
+        <div className="rounded-lg border bg-card p-4">
+          <h2 className="font-semibold">Vous êtes collecteur ?</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Ouvrez le lien que le trésorier vous a envoyé. La campagne s'ajoute à ce téléphone.
+          </p>
+        </div>
       </div>
-      <div className="card">
-        <h2>Vous êtes collecteur ?</h2>
-        <p>Ouvrez le lien que le trésorier vous a envoyé. Il ajoute la campagne à ce téléphone.</p>
-      </div>
-      <p className="muted small center">
-        Tout est enregistré sur le téléphone d'abord. Les pesées sont envoyées au trésorier dès qu'il y a du réseau. 👻 = pas encore envoyé.
-      </p>
+
+      <ol className="mt-8 grid gap-4">
+        {steps.map(([title, text], i) => (
+          <li key={title} className="flex gap-3">
+            <span className="flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold tabular-nums">{i + 1}</span>
+            <div>
+              <p className="text-sm font-medium">{title}</p>
+              <p className="text-sm text-muted-foreground">{text}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }
@@ -31,14 +57,14 @@ export function Welcome() {
 export function Waiting() {
   const s = useStatus(app);
   return (
-    <div className="hero">
-      <div className="big">📡</div>
-      <h1>En attente des données</h1>
-      <p className="muted">Ce téléphone a rejoint la campagne, mais n'a pas encore reçu ses données. Elles arrivent dès qu'il y a du réseau.</p>
-      {!s.online && <p className="warn">Pas de réseau pour le moment.</p>}
-      <button type="button" className="btn primary" onClick={() => app.triggerSync()}>
-        Réessayer maintenant
-      </button>
+    <div className="pt-6">
+      <Empty icon={CloudOff}>
+        <p className="font-medium text-foreground">En attente des données de la campagne</p>
+        <p>Ce téléphone a bien rejoint la campagne. Ses données arrivent dès qu'il y a du réseau.</p>
+        <Button className="mt-2" variant="outline" disabled={!s.online} onClick={() => app.triggerSync()}>
+          {s.online ? "Réessayer maintenant" : "Pas de réseau pour le moment"}
+        </Button>
+      </Empty>
     </div>
   );
 }
@@ -54,34 +80,39 @@ export function RolePicker() {
   if (!app.canWrite()) {
     return (
       <div>
-        <h1>Lecture seule</h1>
-        <p className="muted">Ce téléphone a reçu le lien de lecture : il peut consulter la campagne, pas peser.</p>
-        <button type="button" className="btn primary block" onClick={() => choose({ kind: "viewer" })}>
+        <PageHeader title="Lecture seule" description="Ce téléphone a reçu le lien de lecture : il peut consulter la campagne, pas peser." />
+        <Button size="lg" className="w-full" onClick={() => choose({ kind: "viewer" })}>
+          <Eye aria-hidden />
           Consulter la campagne
-        </button>
+        </Button>
       </div>
     );
   }
   return (
     <div>
-      <h1>Qui utilise ce téléphone ?</h1>
-      <p className="muted">Ce choix reste sur ce téléphone. Vous pourrez le changer depuis l'accueil.</p>
-      <h2>Collecteurs</h2>
-      {usable.length === 0 && <p className="muted">Le trésorier n'a pas encore ajouté de collecteur.</p>}
-      <ul className="list">
-        {usable.map((c) => (
-          <li key={c.id}>
-            <button type="button" className="row" onClick={() => choose({ kind: "collector", collectorId: c.id })}>
-              <span className="row-title">{c.name}</span>
-              <span className="muted">{c.code}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
-      <h2>Coopérative</h2>
-      <button type="button" className="btn block" onClick={() => choose({ kind: "treasurer" })}>
-        Je suis le trésorier
-      </button>
+      <PageHeader title="Qui utilise ce téléphone ?" description="Ce choix reste sur ce téléphone. Vous pourrez le changer plus tard." />
+      <h2 className="mb-2 text-sm font-semibold text-muted-foreground">Collecteurs</h2>
+      {usable.length === 0 ? (
+        <Empty>Le trésorier n'a pas encore ajouté de collecteur.</Empty>
+      ) : (
+        <List>
+          {usable.map((c) => (
+            <li key={c.id}>
+              <button type="button" className="w-full text-left hover:bg-accent" onClick={() => choose({ kind: "collector", collectorId: c.id })}>
+                <ListItem icon={UserRound} title={c.name} subtitle={`Code ${c.code}`} end={<ChevronRight className="size-4 text-muted-foreground" />} />
+              </button>
+            </li>
+          ))}
+        </List>
+      )}
+      <h2 className="mt-6 mb-2 text-sm font-semibold text-muted-foreground">Coopérative</h2>
+      <List>
+        <li>
+          <button type="button" className="w-full text-left hover:bg-accent" onClick={() => choose({ kind: "treasurer" })}>
+            <ListItem icon={Landmark} title="Je suis le trésorier" subtitle="Paiements, retenues, chargements" end={<ChevronRight className="size-4 text-muted-foreground" />} />
+          </button>
+        </li>
+      </List>
     </div>
   );
 }

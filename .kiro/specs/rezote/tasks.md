@@ -85,6 +85,15 @@ The submission deadline is December 4, 2026, 2:00 pm Pacific Time. Each task lis
   - Same tests (58) and end-to-end checks (29) passing
   - _Requirements: 1.4, 4.1, 7.5, 7.6b, 10.4_
 
+## Fixes and redesign (Nov 16)
+
+- [x] 18. Security headers on HTML pages: custom Worker entry serves the SPA shell with CSP (script hashes), HSTS, and related headers; one shared policy for pages and static files
+- [x] 19. Removed the deployment test campaigns from the production database (demo spaces kept)
+- [x] 20. First visit offline: all route code loaded right after start; "Préparation du mode hors ligne" notice until the service worker is ready
+- [x] 21. Interface redesign with shadcn/ui and Tailwind v4: light theme for sunlight, lucide icons instead of emojis, bottom navigation per role, sync pill, menu sheet, dialogs and toasts instead of browser pop-ups
+  - Size budget raised to 300 KB (measured 245 to 255 KB)
+  - 58 unit tests and 33 end-to-end checks passing
+
 ## Verification done
 
 - 58 unit and property-based tests (`npm test`), typecheck and lint clean.
@@ -103,7 +112,7 @@ The submission deadline is December 4, 2026, 2:00 pm Pacific Time. Each task lis
   - `docs/deploy.md`: Cloudflare account, D1 database, deploying both app Workers, demo seed
   - _Requirements: 6.4, 7.8, 10.5_
 
-- [ ] 15. Deployment (done by you, following `docs/deploy.md`)
+- [x] 15. Deployment: collecte.abdrahamane.dev and carnet.abdrahamane.dev, D1 in WEUR, demo data seeded
   - One D1 database; both apps deployed as Cloudflare Workers (app + /api) with `npm run deploy -w <app>`
   - Run the demo seed against the deployed server
   - Manual test on two real phones: airplane mode, record data, reconnect, check the other phone

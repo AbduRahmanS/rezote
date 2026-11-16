@@ -65,7 +65,7 @@ The interface is in French. Amounts are in FCFA (XOF), which has no subunits. Se
 
 #### Acceptance criteria
 
-1. THE first load of each app SHALL transfer at most 250 KB (gzip), including HTML, CSS, JavaScript, and icons. (Raised from 150 KB when the apps moved to TanStack Start and React; after the first visit the service worker serves everything from the phone.)
+1. THE first load of each app SHALL transfer at most 300 KB (gzip), including HTML, CSS, JavaScript, and icons. (Raised from 150 KB with TanStack Start and React, then to 300 KB with shadcn/ui; after the first visit the service worker serves everything from the phone.)
 2. THE system SHALL NOT load web fonts, map tiles, analytics, or third-party scripts.
 3. THE sync protocol SHALL send only new events in each direction, never the full dataset.
 4. THE build SHALL fail if an app exceeds the size budget.

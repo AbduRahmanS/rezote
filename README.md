@@ -9,7 +9,14 @@ Built for the Kiroween 2026 hackathon, **Skeleton Crew** category: one skeleton,
 | **Collecte** | [`apps/collecte`](apps/collecte) | Cotton cooperatives: collectors in the villages, the treasurer in town | Three paper notebooks per weighing session, and disputes over weights and payments |
 | **Carnet de route** | [`apps/carnet-de-route`](apps/carnet-de-route) | Truck drivers on the Dakar–Bamako and Abidjan–Bamako corridors, and truck owners | Phone calls and arguments about fuel, fees, and delays |
 
-Demo links: _added after deployment (see [docs/deploy.md](docs/deploy.md))._
+**Live apps:** [collecte.abdrahamane.dev](https://collecte.abdrahamane.dev) · [carnet.abdrahamane.dev](https://carnet.abdrahamane.dev)
+
+**Demo data (read-only links):**
+
+- [Collecte: a cotton campaign with 41 farmers, about 50 t weighed, 3 truckloads, and 3 flags](https://collecte.abdrahamane.dev/#s=oSSQJhlPV5DvqdY7ma6NTQ&e=wot4_-EZQ1AJ4y2xX9PEebeLVsHedbeg-gqHC6IfY7U)
+- [Carnet de route: a finished Abidjan → Bamako trip and a Dakar trip waiting at Moussala](https://carnet.abdrahamane.dev/#s=KMgC9oz_yW5FTZzpj_gI2g&e=A2JBdogwhZuGgCkT-4hTBNwAHM0EmZWNYzZTNMDHMHg)
+
+To try recording data, open an app and create your own campaign or truck. Turn on airplane mode to see the ghosts 👻, then turn it off to watch them sync.
 
 ## The problem
 
@@ -36,6 +43,7 @@ In both cases the data is recorded where there is no network, and several people
 | Layer | Technology |
 |---|---|
 | Framework | **TanStack Start** (React 19) in SPA mode, deployed as a Cloudflare Worker |
+| UI | **shadcn/ui** (Radix primitives) on **Tailwind CSS v4**, lucide icons, sonner toasts, in `packages/ui` |
 | Routing | **TanStack Router**: file-based routes, typed params, search params validated with Zod |
 | Forms | **TanStack Form** with **Zod** field validators |
 | State | **TanStack Store** (runtime state, sync status, ghosts, per-phone settings) |
@@ -71,14 +79,15 @@ TanStack Query is not used: the apps read from the phone, not from server querie
 - **Sync.** Push the outbox in batches of 500, then pull everything after the last cursor. Retries back off at 2, 4, 8 s and so on, capped at 5 minutes. The server ignores duplicates, so a lost response never creates a double entry.
 - **Same origin.** Each app's Worker serves its own `/api`, so there is no CORS, and each Worker only serves spaces of its own app even though both share one database.
 - **Offline app shell.** TanStack Start prerenders the SPA shell; the service worker precaches it with every asset and serves it for every page, so the app opens with no network after the first visit.
-- **Size.** Each app's first load is about 180 KB gzip, checked in CI against a 250 KB budget. No web fonts, map tiles, analytics, or third-party scripts.
+- **Size.** Each app's first load is about 245 to 255 KB gzip, checked in CI against a 300 KB budget. No web fonts, map tiles, analytics, or third-party scripts.
+- **Offline from the first second.** Once the first screen is up, the code of every other screen is loaded too, so the app keeps working even if the network drops before the service worker has finished caching.
 
 ### Security model and limits
 
 - A space (one campaign, one truck) has a random ID, a 256-bit encryption key **E**, and a 128-bit write key **W**, all created on the phone.
 - **Write link** `#s=…&e=E&w=W`: record and read. **Read link** `#s=…&e=E`: read only. Keys travel in the URL fragment, which browsers never send to servers, and the app removes them from the address bar after joining.
 - The server stores only `SHA-256(W)` and checks it on every write. Ciphertexts are bound to their envelope (ID, space, time, device), so they cannot be moved or replayed into another event.
-- Content-Security-Policy allows only the app's own scripts, plus the SHA-256 hashes of TanStack Start's inline bootstrap scripts, computed at build time.
+- Every response, HTML pages included, carries a Content-Security-Policy that allows only the app's own scripts plus the SHA-256 hashes of TanStack Start's inline bootstrap scripts, along with HSTS, `nosniff`, `no-referrer`, and `frame-ancestors 'none'`. One policy file (`packages/core/security.mjs`) feeds both the Worker (pages) and `_headers` (static files).
 - **Limits:** anyone holding a link has its rights; links cannot be revoked in this version (create a new space instead); losing every link means losing access; data on an unlocked phone is readable by whoever holds the phone; everyone with the write link is trusted to write.
 
 ## Run it locally
@@ -120,7 +129,8 @@ Deployment to Cloudflare (free plan): [docs/deploy.md](docs/deploy.md). Building
 ## Project structure
 
 ```
-packages/core/       skeleton: events, crypto, storage, sync, runtime, formats; react/ (shell, widgets, hooks, styles)
+packages/ui/         design system: shadcn/ui components and the Tailwind theme
+packages/core/       skeleton: events, crypto, storage, sync, runtime, formats, Worker entry, security headers; react/ (shell, widgets, dialogs, hooks)
 packages/sync-api/   sync API handlers (framework-free) and D1 migrations
 apps/collecte/       app 1: src/domain (pure, tested), src/routes (TanStack Router), wrangler.jsonc
 apps/carnet-de-route/  app 2

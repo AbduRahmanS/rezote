@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/globals.css",
+    "baseColor": "stone",
+    "cssVariables": true
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@rezote/ui/components",
+    "utils": "@rezote/ui/lib/utils",
+    "ui": "@rezote/ui/components",
+    "lib": "@rezote/ui/lib",
+    "hooks": "@rezote/ui/hooks"
+  }
+}

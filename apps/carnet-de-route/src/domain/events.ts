@@ -19,20 +19,20 @@ export const CORRIDORS = {
 } as const;
 
 export const KINDS = {
-  fuel: { label: "Carburant", emoji: "⛽" },
-  checkpoint: { label: "Contrôle", emoji: "🛑" },
-  weighbridge: { label: "Pesage", emoji: "⚖️" },
-  customs: { label: "Douane", emoji: "🛃" },
-  border: { label: "Frontière", emoji: "🚧" },
-  convoy: { label: "Attente d'escorte", emoji: "🪖" },
-  toll: { label: "Péage", emoji: "🎫" },
-  meal: { label: "Repas", emoji: "🍲" },
-  repair: { label: "Réparation", emoji: "🔧" },
-  breakdown: { label: "Panne", emoji: "⚠️" },
-  rest: { label: "Repos", emoji: "😴" },
-  loading: { label: "Chargement", emoji: "📦" },
-  unloading: { label: "Déchargement", emoji: "📤" },
-  other: { label: "Autre", emoji: "📝" },
+  fuel: { label: "Carburant" },
+  checkpoint: { label: "Contrôle" },
+  weighbridge: { label: "Pesage" },
+  customs: { label: "Douane" },
+  border: { label: "Frontière" },
+  convoy: { label: "Attente d'escorte" },
+  toll: { label: "Péage" },
+  meal: { label: "Repas" },
+  repair: { label: "Réparation" },
+  breakdown: { label: "Panne" },
+  rest: { label: "Repos" },
+  loading: { label: "Chargement" },
+  unloading: { label: "Déchargement" },
+  other: { label: "Autre" },
 } as const;
 
 export type Kind = keyof typeof KINDS;

@@ -1,6 +1,8 @@
 // Allocates the next receipt number on this phone, then opens the weighing screen.
-import { BackLink, Empty } from "@rezote/core/react";
+import { Empty, PageHeader } from "@rezote/core/react";
+import { Button } from "@rezote/ui/components/button";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { app, newId, useRole, useView } from "../../../runtime.ts";
 
@@ -37,13 +39,21 @@ function StartWeighing() {
   if (!collector)
     return (
       <div>
-        <BackLink />
-        <p>Seul un collecteur peut peser. Choisissez votre nom dans « Rôle ».</p>
-        <Link className="btn" to="/role">
-          Choisir mon rôle
-        </Link>
+        <PageHeader title="Seul un collecteur peut peser" back={{ to: "/" }} description="Choisissez votre nom de collecteur sur ce téléphone." />
+        <Button asChild>
+          <Link to="/role">Choisir mon rôle</Link>
+        </Button>
       </div>
     );
-  if (collector.duplicateCode) return <p className="bad">Votre code {collector.code} est en double. Demandez au trésorier de vous en donner un autre.</p>;
-  return <p className="muted">{error || "Ouverture de la pesée…"}</p>;
+  if (collector.duplicateCode)
+    return <Empty>Votre code {collector.code} est en double. Demandez au trésorier de vous en donner un autre.</Empty>;
+  return (
+    <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
+      {error || (
+        <>
+          <Loader2 className="size-4 animate-spin" aria-hidden /> Ouverture de la pesée…
+        </>
+      )}
+    </div>
+  );
 }

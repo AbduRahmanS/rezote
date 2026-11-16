@@ -1,0 +1,15 @@
+@import "@rezote/ui/globals.css";
+@source "./";
+
+/* Collecte: a field green. */
+:root {
+  --primary: oklch(0.44 0.09 155);
+  --primary-foreground: oklch(0.985 0.01 150);
+  --ring: oklch(0.44 0.09 155 / 0.45);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: oklch(0.72 0.12 155);
+    --primary-foreground: oklch(0.2 0.03 155);
+  }
+}
