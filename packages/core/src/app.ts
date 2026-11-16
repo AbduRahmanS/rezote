@@ -1,8 +1,10 @@
-// The skeleton runtime. An app declares its event schemas and a pure projection;
-// the runtime handles storage, encryption, sync, status, sharing, and joining.
+// The skeleton runtime. An app declares its event schemas (Zod) and a pure
+// projection; the runtime handles storage, encryption, sync, status, sharing,
+// and joining. State lives in a TanStack Store so React screens can subscribe
+// to exactly what they read.
 
-import { computed, signal, type ReadonlySignal } from "@preact/signals";
-import * as v from "valibot";
+import { Store } from "@tanstack/store";
+import type { z } from "zod";
 import { randomBase64Url } from "./base64.ts";
 import {
   generateSecrets,
@@ -17,18 +19,18 @@ import {
 import { canonical, type Envelope, type RezoteEvent } from "./event.ts";
 import { buildLinks, parseLink, type ShareLinks } from "./links.ts";
 import { Storage, type RejectedItem } from "./storage.ts";
-import { httpTransport, SyncEngine, type SpaceRecord, type SyncTransport } from "./sync.ts";
+import { httpTransport, SyncEngine, type SpaceRecord, type SyncStatus, type SyncTransport } from "./sync.ts";
 
-export type EventSchemas = Record<string, v.GenericSchema>;
+export type EventSchemas = Record<string, z.ZodType>;
 
 export type AppEvent<M extends EventSchemas> = {
-  [K in keyof M & string]: RezoteEvent<K, v.InferOutput<M[K]>>;
+  [K in keyof M & string]: RezoteEvent<K, z.output<M[K]>>;
 }[keyof M & string];
 
-export type PayloadOf<M extends EventSchemas, K extends keyof M> = v.InferInput<M[K]>;
+export type PayloadOf<M extends EventSchemas, K extends keyof M> = z.input<M[K]>;
 
 export interface AppDefinition<M extends EventSchemas, V> {
-  /** Short name, also the IndexedDB name and the server's app tag. */
+  /** Short name: the IndexedDB name and the server's app tag. */
   name: string;
   events: M;
   /** Fields only members with the write link can read. They must be optional in the schema. */
@@ -41,7 +43,7 @@ export function defineApp<M extends EventSchemas, V>(def: AppDefinition<M, V>): 
   return def;
 }
 
-/** Validates and decodes an envelope against an app definition. Shared by the runtime and Node tools. */
+/** Decrypts and validates an envelope against an app definition. Shared by the runtime and Node tools. */
 export async function decodeEnvelope<M extends EventSchemas>(
   def: AppDefinition<M, unknown>,
   envelope: Envelope,
@@ -51,55 +53,60 @@ export async function decodeEnvelope<M extends EventSchemas>(
   if (!opened.ok) return null;
   const schema = def.events[opened.event.type];
   if (!schema) return null;
-  const parsed = v.safeParse(schema, opened.event.payload);
+  const parsed = schema.safeParse(opened.event.payload);
   if (!parsed.success) return null;
-  return { ...opened.event, payload: parsed.output } as AppEvent<M>;
+  return { ...opened.event, payload: parsed.data } as AppEvent<M>;
 }
 
 export interface RuntimeOptions {
-  serverUrl: string;
-  /** Base URL used in share links. Defaults to the current page without its fragment. */
+  /** Base URL of the sync API. Defaults to "/api" on the same origin as the app. */
+  apiUrl?: string;
+  /** Base URL used in share links. Defaults to the current origin. */
   appUrl?: string;
   transport?: SyncTransport;
   autoStart?: boolean;
 }
 
-export class RezoteApp<M extends EventSchemas, V> {
-  readonly ready = signal(false);
-  readonly spaces = signal<SpaceRecord[]>([]);
-  readonly currentId = signal<string | null>(null);
-  readonly lastJoin = signal<{ space: string; write: boolean } | null>(null);
-  readonly rejected = signal<RejectedItem[]>([]);
+export interface RuntimeState<M extends EventSchemas> {
+  ready: boolean;
+  spaces: SpaceRecord[];
+  currentId: string | null;
+  /** Canonical events of the current space. */
+  events: readonly AppEvent<M>[];
+  rejected: RejectedItem[];
+  lastJoin: { space: string; write: boolean } | null;
+}
 
-  readonly current: ReadonlySignal<SpaceRecord | null>;
-  readonly view: ReadonlySignal<V | null>;
-  readonly events: ReadonlySignal<readonly AppEvent<M>[]>;
+export class RezoteApp<M extends EventSchemas, V> {
+  readonly store = new Store<RuntimeState<M>>({
+    ready: false,
+    spaces: [],
+    currentId: null,
+    events: [],
+    rejected: [],
+    lastJoin: null,
+  });
 
   private storage!: Storage;
   private engine!: SyncEngine;
   private device = "";
   private readonly cache = new Map<string, AppEvent<M>[]>();
   private readonly keys = new Map<string, Promise<SpaceKeys>>();
-  private readonly version = signal(0);
+  private viewCache: { events: readonly AppEvent<M>[]; view: V } | null = null;
+  private initPromise: Promise<void> | null = null;
 
   constructor(
     readonly def: AppDefinition<M, V>,
-    private readonly options: RuntimeOptions,
-  ) {
-    this.current = computed(() => this.spaces.value.find((s) => s.id === this.currentId.value) ?? null);
-    this.events = computed(() => {
-      void this.version.value; // subscribe: bumped whenever the event cache changes
-      const id = this.currentId.value;
-      return id ? (this.cache.get(id) ?? []) : [];
-    });
-    this.view = computed(() => (this.currentId.value ? this.def.project(this.events.value) : null));
-  }
+    private readonly options: RuntimeOptions = {},
+  ) {}
 
-  get status() {
+  /** Sync status store (online, syncing, pending, ignored, last sync, last error). */
+  get status(): Store<SyncStatus> {
     return this.engine.status;
   }
 
-  get ghosts() {
+  /** Outbox IDs store: events not yet confirmed by the server. */
+  get ghosts(): Store<ReadonlySet<string>> {
     return this.engine.ghosts;
   }
 
@@ -107,24 +114,47 @@ export class RezoteApp<M extends EventSchemas, V> {
     return this.device;
   }
 
+  get state(): RuntimeState<M> {
+    return this.store.get();
+  }
+
+  get current(): SpaceRecord | null {
+    const s = this.store.get();
+    return s.spaces.find((x) => x.id === s.currentId) ?? null;
+  }
+
+  /** Projection of the current space, recomputed only when its events change. */
+  get view(): V | null {
+    const { currentId, events } = this.store.get();
+    if (!currentId) return null;
+    if (this.viewCache?.events !== events) this.viewCache = { events, view: this.def.project(events) };
+    return this.viewCache.view;
+  }
+
   isGhost(eventId: string): boolean {
-    return this.engine.ghosts.value.has(eventId);
+    return this.engine.ghosts.get().has(eventId);
   }
 
-  canWrite(space = this.currentId.value): boolean {
-    return !!this.spaces.value.find((s) => s.id === space)?.write;
+  canWrite(space = this.store.get().currentId): boolean {
+    return !!this.store.get().spaces.find((s) => s.id === space)?.write;
   }
 
-  async init(): Promise<void> {
+  /** Opens storage, joins a space from the URL fragment if present, and starts syncing. Safe to call twice. */
+  init(): Promise<void> {
+    this.initPromise ??= this.doInit();
+    return this.initPromise;
+  }
+
+  private async doInit(): Promise<void> {
     this.storage = await Storage.open(this.def.name);
     this.device = (await this.storage.getMeta<string>("device")) ?? randomBase64Url(12);
     await this.storage.setMeta("device", this.device);
-    this.spaces.value = (await this.storage.getMeta<SpaceRecord[]>("spaces")) ?? [];
+    this.patch({ spaces: (await this.storage.getMeta<SpaceRecord[]>("spaces")) ?? [] });
 
     this.engine = new SyncEngine({
       storage: this.storage,
-      transport: this.options.transport ?? httpTransport(this.options.serverUrl),
-      spaces: () => this.spaces.value,
+      transport: this.options.transport ?? httpTransport(this.options.apiUrl ?? "/api"),
+      spaces: () => this.store.get().spaces,
       markRegistered: async (id) => this.updateSpace(id, { registered: true }),
       decode: async (envelope) => {
         const keys = this.keysFor(envelope.space);
@@ -134,24 +164,24 @@ export class RezoteApp<M extends EventSchemas, V> {
     });
 
     let ignored = 0;
-    for (const s of this.spaces.value) ignored += (await this.storage.getMeta<number>(`ignored:${s.id}`)) ?? 0;
-    this.engine.status.value = { ...this.engine.status.value, ignored };
+    for (const s of this.store.get().spaces) ignored += (await this.storage.getMeta<number>(`ignored:${s.id}`)) ?? 0;
+    this.engine.status.setState((prev) => ({ ...prev, ignored }));
 
     const joined = typeof location !== "undefined" ? parseLink(location.hash) : null;
     if (joined) {
       await this.join(joined);
-      history.replaceState(null, "", `${location.pathname}${location.search}#/`);
+      // Remove the keys from the address bar and the browser history.
+      history.replaceState(history.state, "", `${location.pathname}${location.search}`);
     } else {
       const saved = await this.storage.getMeta<string>("current");
-      const fallback = this.spaces.value[0]?.id ?? null;
-      await this.select(saved && this.spaces.value.some((s) => s.id === saved) ? saved : fallback);
+      const spaces = this.store.get().spaces;
+      await this.select(saved && spaces.some((s) => s.id === saved) ? saved : (spaces[0]?.id ?? null));
     }
 
-    this.ready.value = true;
+    this.patch({ ready: true });
     if (this.options.autoStart !== false) this.engine.start();
   }
 
-  /** Runs a sync cycle now and waits for it. */
   syncNow(): Promise<boolean> {
     return this.engine.syncNow();
   }
@@ -161,13 +191,16 @@ export class RezoteApp<M extends EventSchemas, V> {
   }
 
   async select(space: string | null): Promise<void> {
-    if (space) await this.reload(space);
-    this.currentId.value = space;
+    if (space) await this.loadEvents(space);
     await this.storage.setMeta("current", space);
-    this.rejected.value = space ? await this.storage.listRejected(space) : [];
+    this.patch({
+      currentId: space,
+      events: space ? (this.cache.get(space) ?? []) : [],
+      rejected: space ? await this.storage.listRejected(space) : [],
+    });
   }
 
-  /** Creates a new space on this phone. It is registered on the server at the next sync. */
+  /** Creates a new space on this phone. It is registered on the server at the next sync, so this works offline. */
   async createSpace(label: string): Promise<string> {
     const secrets = generateSecrets();
     const record: SpaceRecord = {
@@ -180,7 +213,7 @@ export class RezoteApp<M extends EventSchemas, V> {
       label,
       joinedAt: Date.now(),
     };
-    await this.saveSpaces([...this.spaces.value, record]);
+    await this.saveSpaces([...this.store.get().spaces, record]);
     await this.select(record.id);
     this.engine.trigger();
     return record.id;
@@ -188,72 +221,63 @@ export class RezoteApp<M extends EventSchemas, V> {
 
   /** Joins a space from a share link. A write link upgrades an existing read-only membership. */
   async join(secrets: SpaceSecrets): Promise<void> {
-    const existing = this.spaces.value.find((s) => s.id === secrets.space);
+    const existing = this.store.get().spaces.find((s) => s.id === secrets.space);
     if (existing) {
       if (secrets.write && !existing.write) {
         this.keys.delete(existing.id);
         await this.updateSpace(existing.id, { write: secrets.write, writeKeyHash: await writeKeyHash(secrets.write), registered: true });
       }
     } else {
-      const record: SpaceRecord = {
-        id: secrets.space,
-        app: this.def.name,
-        enc: secrets.enc,
-        registered: true,
-        joinedAt: Date.now(),
-      };
+      const record: SpaceRecord = { id: secrets.space, app: this.def.name, enc: secrets.enc, registered: true, joinedAt: Date.now() };
       if (secrets.write) record.write = secrets.write;
-      await this.saveSpaces([...this.spaces.value, record]);
+      await this.saveSpaces([...this.store.get().spaces, record]);
     }
-    this.lastJoin.value = { space: secrets.space, write: !!secrets.write };
+    this.patch({ lastJoin: { space: secrets.space, write: !!secrets.write } });
     await this.select(secrets.space);
     this.engine?.trigger();
   }
 
-  links(space = this.currentId.value): ShareLinks | null {
-    const s = this.spaces.value.find((x) => x.id === space);
+  links(space = this.store.get().currentId): ShareLinks | null {
+    const s = this.store.get().spaces.find((x) => x.id === space);
     if (!s) return null;
-    const appUrl = this.options.appUrl ?? (typeof location !== "undefined" ? `${location.origin}${location.pathname}` : "");
+    const appUrl = this.options.appUrl ?? (typeof location !== "undefined" ? `${location.origin}/` : "");
     const secrets: SpaceSecrets = { space: s.id, enc: s.enc };
     if (s.write) secrets.write = s.write;
     return buildLinks(appUrl, secrets);
   }
 
   async setLabel(space: string, label: string): Promise<void> {
-    const s = this.spaces.value.find((x) => x.id === space);
+    const s = this.store.get().spaces.find((x) => x.id === space);
     if (s && s.label !== label) await this.updateSpace(space, { label });
   }
 
   /** Removes a space from this phone only. Data stays on the server and on other phones. */
   async leave(space: string): Promise<void> {
-    await this.saveSpaces(this.spaces.value.filter((s) => s.id !== space));
+    await this.saveSpaces(this.store.get().spaces.filter((s) => s.id !== space));
     this.cache.delete(space);
     this.keys.delete(space);
-    if (this.currentId.value === space) await this.select(this.spaces.value[0]?.id ?? null);
+    if (this.store.get().currentId === space) await this.select(this.store.get().spaces[0]?.id ?? null);
   }
 
   /** Validates, encrypts, stores, and queues a new event, then triggers a sync. */
-  async emit<K extends keyof M & string>(type: K, payload: PayloadOf<M, K>, space = this.currentId.value): Promise<AppEvent<M>> {
-    if (!space) throw new Error("No space selected");
+  async emit<K extends keyof M & string>(type: K, payload: PayloadOf<M, K>, space = this.store.get().currentId): Promise<AppEvent<M>> {
+    if (!space) throw new Error("Aucun espace sélectionné");
     if (!this.canWrite(space)) throw new Error("Lecture seule : ce lien ne permet pas d'écrire");
     const schema = this.def.events[type];
     if (!schema) throw new Error(`Unknown event type ${type}`);
-    const parsed = v.parse(schema, payload);
     const event = {
       id: crypto.randomUUID(),
       space,
       type,
-      payload: parsed,
+      payload: schema.parse(payload),
       ts: Date.now(),
       device: this.device,
     } as AppEvent<M>;
     const keys = await this.keysFor(space)!;
     const envelope = await seal(event, keys, (this.def.writersOnly ?? {}) as WritersOnlyFields);
     await this.storage.appendLocal(event, envelope);
-    const list = this.cache.get(space) ?? [];
-    list.push(event);
-    this.cache.set(space, canonical(list));
-    this.version.value++;
+    this.cache.set(space, canonical([...(this.cache.get(space) ?? []), event]));
+    if (space === this.store.get().currentId) this.patch({ events: this.cache.get(space)! });
     await this.engine.refreshGhosts();
     this.engine.trigger();
     return event;
@@ -271,10 +295,14 @@ export class RezoteApp<M extends EventSchemas, V> {
     return this.storage.setMeta(`app:${key}`, value);
   }
 
+  private patch(p: Partial<RuntimeState<M>>): void {
+    this.store.setState((prev) => ({ ...prev, ...p }));
+  }
+
   private keysFor(space: string): Promise<SpaceKeys> | undefined {
     let keys = this.keys.get(space);
     if (!keys) {
-      const s = this.spaces.value.find((x) => x.id === space);
+      const s = this.store.get().spaces.find((x) => x.id === space);
       if (!s) return undefined;
       const secrets: SpaceSecrets = { space: s.id, enc: s.enc };
       if (s.write) secrets.write = s.write;
@@ -284,23 +312,28 @@ export class RezoteApp<M extends EventSchemas, V> {
     return keys;
   }
 
-  private async reload(space: string): Promise<void> {
+  private async loadEvents(space: string): Promise<void> {
     const events = (await this.storage.listEvents(space)) as AppEvent<M>[];
     this.cache.set(space, canonical(events));
-    if (space === this.currentId.value) this.rejected.value = await this.storage.listRejected(space);
-    this.version.value++;
+  }
+
+  private async reload(space: string): Promise<void> {
+    await this.loadEvents(space);
+    if (space === this.store.get().currentId) {
+      this.patch({ events: this.cache.get(space)!, rejected: await this.storage.listRejected(space) });
+    }
   }
 
   private async updateSpace(id: string, patch: Partial<SpaceRecord>): Promise<void> {
-    await this.saveSpaces(this.spaces.value.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+    await this.saveSpaces(this.store.get().spaces.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   }
 
   private async saveSpaces(spaces: SpaceRecord[]): Promise<void> {
-    this.spaces.value = spaces;
+    this.patch({ spaces });
     await this.storage.setMeta("spaces", spaces);
   }
 }
 
-export function createApp<M extends EventSchemas, V>(def: AppDefinition<M, V>, options: RuntimeOptions): RezoteApp<M, V> {
+export function createApp<M extends EventSchemas, V>(def: AppDefinition<M, V>, options?: RuntimeOptions): RezoteApp<M, V> {
   return new RezoteApp(def, options);
 }

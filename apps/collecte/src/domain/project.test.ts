@@ -1,6 +1,6 @@
 import { canonical, type AppEvent } from "@rezote/core";
 import fc from "fast-check";
-import * as v from "valibot";
+import type { z } from "zod";
 import { describe, expect, it } from "vitest";
 import { events as schemas, type CollecteEvents } from "./events.ts";
 import { project, type CollecteView } from "./project.ts";
@@ -10,8 +10,8 @@ type E = AppEvent<CollecteEvents>;
 const T0 = Date.UTC(2026, 10, 14, 8);
 
 let seq = 0;
-function ev<K extends keyof CollecteEvents & string>(type: K, payload: v.InferInput<CollecteEvents[K]>, ts: number): E {
-  return { id: `e${String(++seq).padStart(6, "0")}`, space: "S", type, payload: v.parse(schemas[type], payload), ts, device: "d" } as E;
+function ev<K extends keyof CollecteEvents & string>(type: K, payload: z.input<CollecteEvents[K]>, ts: number): E {
+  return { id: `e${String(++seq).padStart(6, "0")}`, space: "S", type, payload: schemas[type].parse(payload), ts, device: "d" } as E;
 }
 
 const GRADES = [

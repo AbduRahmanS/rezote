@@ -1,7 +1,8 @@
-# Cloudflare Pages security headers. If the sync server is not on *.workers.dev,
-# add its origin to connect-src (see docs/deploy.md).
+# Security headers for the static files served by the Worker. The sync API is on
+# the same origin (/api), so connect-src is 'self'. scripts/build-sw.mjs adds the
+# hashes of the inline bootstrap scripts of the shell to script-src at build time.
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://*.workers.dev; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'
   Referrer-Policy: no-referrer
   X-Content-Type-Options: nosniff
   Permissions-Policy: camera=(), microphone=(), geolocation=(self)

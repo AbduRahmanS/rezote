@@ -2,7 +2,7 @@
 
 **Rezote** (from Bambara *rezo tɛ*, "no network") is a template for web apps that keep working where the mobile network is weak or absent, as in villages and on the roads of Mali and West Africa. Every action is saved on the phone first. Changes that have not reached the server yet are shown as ghosts 👻 and come back to life on the server when the network returns. Everything is encrypted on the phone, so the server stores data it cannot read.
 
-Built for the Kiroween 2026 hackathon, **Skeleton Crew** category: one skeleton, two very different apps.
+Built for the Kiroween 2026 hackathon, **Skeleton Crew** category: one skeleton, two very different apps, built with TanStack Start.
 
 | App | Folder | Who uses it | What it replaces |
 |---|---|---|---|
@@ -31,32 +31,54 @@ In both cases the data is recorded where there is no network, and several people
 - **Owner:** last place and time reported, when the driver's phone last synced, advances against expenses (the cash the driver should still have), time stopped by kind, estimated fuel consumption, and a full timeline. A trip summary can be shared as text.
 - **Safety:** a truck's position is life-safety data on corridors where convoys are attacked. GPS is **off by default**. Positions are encrypted with a second key that only write-link holders have, so read-link holders (for example a client waiting for goods) never see them, and shared summaries never include them.
 
+## Tech stack
+
+| Layer | Technology |
+|---|---|
+| Framework | **TanStack Start** (React 19) in SPA mode, deployed as a Cloudflare Worker |
+| Routing | **TanStack Router**: file-based routes, typed params, search params validated with Zod |
+| Forms | **TanStack Form** with **Zod** field validators |
+| State | **TanStack Store** (runtime state, sync status, ghosts, per-phone settings) |
+| Schemas | **Zod 4**: every event payload is validated on write and again when another phone decrypts it |
+| Local storage | IndexedDB via `idb` |
+| Encryption | Web Crypto API (AES-GCM, HKDF, SHA-256), no library |
+| Sync API | `packages/sync-api`: framework-free handlers mounted in a TanStack Start server route (`/api/$`), Cloudflare D1 |
+| Offline shell | Service worker generated after the build from the prerendered SPA shell (`scripts/build-sw.mjs`) |
+| Tests | Vitest, fast-check (property-based), fake-indexeddb, Node's built-in SQLite for the API |
+| Lint | ESLint with typescript-eslint, `@tanstack/eslint-plugin-router`, `@tanstack/eslint-plugin-query`, React hooks rules |
+
+TanStack Query is not used: the apps read from the phone, not from server queries, and the sync engine owns all network calls. TanStack DB was considered for its offline transactions and left out: it is a release candidate, and its mutable-row model does not fit immutable, end-to-end-encrypted events.
+
 ## How Rezote works
 
 ```
- Phone (offline-first)                                   Sync server (Cloudflare Worker + D1)
- ┌───────────────────────────────────────────┐           ┌─────────────────────────────────┐
- │ screen ─ app.emit(type, payload)          │           │ stores envelopes:               │
- │   │ validate (valibot)                    │  push     │   id, space, ts, device,        │
- │   │ encrypt (AES-GCM, key E from link)    ├──────────►│   iv, ciphertext                │
- │   │ save event + outbox (IndexedDB, 1 tx) │  pull     │ never sees keys or contents     │
- │   ▼                                       │◄──────────┤ idempotent by event id          │
- │ projection = pure function of all events  │  cursor   │ cursor = server sequence number │
- │ 👻 = still in the outbox                  │           └─────────────────────────────────┘
- └───────────────────────────────────────────┘
+ Phone (offline-first)                                Cloudflare Worker (one per app)
+ ┌──────────────────────────────────────────┐         ┌────────────────────────────────────┐
+ │ TanStack Router screens                  │  first  │ static app + prerendered SPA shell │
+ │   │ app.emit(type, payload)              │  visit  │                                    │
+ │   │ validate (Zod)                       │◄────────┤ /api/$  (TanStack Start route)     │
+ │   │ encrypt (AES-GCM, key E from link)   │         │   → @rezote/sync-api               │
+ │   │ save event + outbox (IndexedDB, 1 tx)│  push   │   stores envelopes in D1:          │
+ │   ▼                                      ├────────►│   id, space, ts, device, iv, ct    │
+ │ view = pure projection of all events     │  pull   │   never sees keys or contents      │
+ │ 👻 = still in the outbox                 │◄────────┤   idempotent by event id           │
+ │ service worker: opens with no network    │ cursor  │                                    │
+ └──────────────────────────────────────────┘         └────────────────────────────────────┘
 ```
 
 - **Events, not rows.** Every action appends an immutable event. Corrections are cancellation events with a reason, so the history explains every number.
 - **Same result on every phone.** Views are pure functions of the event set, replayed in `(ts, id)` order. Merging two phones is a set union, which is commutative, associative, and idempotent. Property-based tests check this for the skeleton and for every app rule.
 - **Sync.** Push the outbox in batches of 500, then pull everything after the last cursor. Retries back off at 2, 4, 8 s and so on, capped at 5 minutes. The server ignores duplicates, so a lost response never creates a double entry.
-- **Offline app shell.** After the first visit, the service worker serves the app with no network.
-- **Small.** Each app's first load is under 40 KB gzip, against a 150 KB budget enforced in CI. No web fonts, map tiles, analytics, or third-party scripts.
+- **Same origin.** Each app's Worker serves its own `/api`, so there is no CORS, and each Worker only serves spaces of its own app even though both share one database.
+- **Offline app shell.** TanStack Start prerenders the SPA shell; the service worker precaches it with every asset and serves it for every page, so the app opens with no network after the first visit.
+- **Size.** Each app's first load is about 180 KB gzip, checked in CI against a 250 KB budget. No web fonts, map tiles, analytics, or third-party scripts.
 
 ### Security model and limits
 
 - A space (one campaign, one truck) has a random ID, a 256-bit encryption key **E**, and a 128-bit write key **W**, all created on the phone.
 - **Write link** `#s=…&e=E&w=W`: record and read. **Read link** `#s=…&e=E`: read only. Keys travel in the URL fragment, which browsers never send to servers, and the app removes them from the address bar after joining.
 - The server stores only `SHA-256(W)` and checks it on every write. Ciphertexts are bound to their envelope (ID, space, time, device), so they cannot be moved or replayed into another event.
+- Content-Security-Policy allows only the app's own scripts, plus the SHA-256 hashes of TanStack Start's inline bootstrap scripts, computed at build time.
 - **Limits:** anyone holding a link has its rights; links cannot be revoked in this version (create a new space instead); losing every link means losing access; data on an unlocked phone is readable by whoever holds the phone; everyone with the write link is trusted to write.
 
 ## Run it locally
@@ -65,13 +87,14 @@ Requires Node 22.
 
 ```bash
 npm ci
-npm run icons                  # generates the app icons
-npm run dev:server             # sync server on http://localhost:8787 (wrangler dev + local D1)
-npm run dev:collecte           # http://localhost:5173
-npm run dev:route              # http://localhost:5174
-```
+npm run icons
+# Create the local database once per app
+(cd apps/collecte && npx wrangler d1 migrations apply rezote --local)
+(cd apps/carnet-de-route && npx wrangler d1 migrations apply rezote --local)
 
-The first time, create the local database with `cd server && npx wrangler d1 migrations apply rezote --local`.
+npm run dev:collecte   # http://localhost:5173 (app + /api, local D1)
+npm run dev:route      # http://localhost:5174
+```
 
 Checks:
 
@@ -80,29 +103,30 @@ npm test             # unit and property-based tests
 npm run typecheck
 npm run lint
 npm run build && npm run check:size
-npm run seed:demo    # fills a local server with a realistic campaign and two truck trips
+npm run seed:demo    # with the two apps running: a realistic cotton campaign and two truck trips
 ```
 
 Deployment to Cloudflare (free plan): [docs/deploy.md](docs/deploy.md). Building another app on the skeleton: [docs/new-app.md](docs/new-app.md).
 
 ## How Kiro was used
 
-- **Spec-driven development.** [`.kiro/specs/rezote`](.kiro/specs/rezote) holds the requirements (testable acceptance criteria), the design (event model, sync protocol, encryption, projections, testing plan), and the task list. The spec went through several rounds: the app ideas changed after we judged them against "does missing network really hurt here?", and field research changed the design. For example, Collecte records each bundle with a running subtotal because that is how village weighing works, and Carnet de route got a "convoy wait" stop and writers-only GPS because of attacks on the corridors.
+- **Spec-driven development.** [`.kiro/specs/rezote`](.kiro/specs/rezote) holds the requirements (testable acceptance criteria), the design (event model, sync protocol, encryption, projections, testing plan), and the task list. The spec went through several rounds: the app ideas changed after we judged them against "does missing network really hurt here?", field research changed the design (bundle-by-bundle weighing, factory gap, convoy waits, writers-only GPS), and the stack moved to TanStack Start with the sync API inside each app's Worker.
 - **Steering.** [`.kiro/steering`](.kiro/steering): `product.md` (users, tone, safety rules), `tech.md` (stack, size budget, integer money and weights, immutable events, server never reads payloads), `structure.md` (where code goes; the skeleton must not import apps).
-- **Hooks.** [`.kiro/hooks`](.kiro/hooks): run the unit and property tests when skeleton, domain, or server code is saved; check the money and ordering rules when a projection changes; build and enforce the size budget at the end of each agent turn.
+- **Hooks.** [`.kiro/hooks`](.kiro/hooks): run the unit and property tests when skeleton, domain, or API code is saved; check the money and ordering rules when a projection changes; build and enforce the size budget at the end of each agent turn.
 - **Property-based testing** with fast-check: order and duplicate invariance of every projection, merge laws, "no event is ever lost" against a server that fails and loses responses at random, encryption round trip and tamper detection, read keys cannot open writers-only fields, rounding per farmer, store and balance identities, cancellation equals never recorded, stop times never negative, and format round trips.
-- **MCP.** Context7 to check current Cloudflare Workers documentation (rate limiting binding).
+- **MCP.** Context7 for current documentation of TanStack Start (SPA mode, server routes) and Cloudflare Workers (rate limiting, TanStack Start deployment, bindings).
+- **End-to-end checks.** A headless browser played four phones against the real Workers and local D1: offline weighing with ghosts, reconnect and sync, read-only links, offline reload through the service worker, and a database that contains no clear text.
 
 ## Project structure
 
 ```
-packages/core/   skeleton: events, crypto, storage, sync, runtime, formats, router, UI shell
-apps/collecte/   app 1 (domain/ is pure and tested; screens/ is UI)
+packages/core/       skeleton: events, crypto, storage, sync, runtime, formats; react/ (shell, widgets, hooks, styles)
+packages/sync-api/   sync API handlers (framework-free) and D1 migrations
+apps/collecte/       app 1: src/domain (pure, tested), src/routes (TanStack Router), wrangler.jsonc
 apps/carnet-de-route/  app 2
-server/          sync server (Hono, D1) and its tests
-scripts/         size budget, icons, demo seed
-docs/            research, deployment, new app guide
-.kiro/           specs, steering, hooks
+scripts/             size budget, service worker, icons, demo seed
+docs/                research, deployment, new app guide
+.kiro/               specs, steering, hooks
 ```
 
 ## License

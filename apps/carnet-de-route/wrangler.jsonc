@@ -1,0 +1,21 @@
+// Carnet de route: one Cloudflare Worker serves the app (TanStack Start, SPA mode) and the sync API under /api.
+// See docs/deploy.md.
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "rezote-carnet",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "@tanstack/react-start/server-entry",
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "rezote",
+      // Replace with the ID printed by `npx wrangler d1 create rezote` (the same database for both apps).
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "../../packages/sync-api/migrations"
+    }
+  ],
+  // 60 writes per minute per IP, per Cloudflare location.
+  "ratelimits": [{ "name": "WRITE_LIMITER", "namespace_id": "1001", "simple": { "limit": 60, "period": 60 } }]
+}

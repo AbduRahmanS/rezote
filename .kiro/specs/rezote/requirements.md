@@ -65,7 +65,7 @@ The interface is in French. Amounts are in FCFA (XOF), which has no subunits. Se
 
 #### Acceptance criteria
 
-1. THE first load of each app SHALL transfer at most 150 KB (gzip), including HTML, CSS, JavaScript, and icons.
+1. THE first load of each app SHALL transfer at most 250 KB (gzip), including HTML, CSS, JavaScript, and icons. (Raised from 150 KB when the apps moved to TanStack Start and React; after the first visit the service worker serves everything from the phone.)
 2. THE system SHALL NOT load web fonts, map tiles, analytics, or third-party scripts.
 3. THE sync protocol SHALL send only new events in each direction, never the full dataset.
 4. THE build SHALL fail if an app exceeds the size budget.
@@ -103,6 +103,7 @@ The interface is in French. Amounts are in FCFA (XOF), which has no subunits. Se
 3. THE system SHALL offer two share links: a **write link** (space ID, encryption key, write key) for people who record data, and a **read link** (space ID, encryption key) for people who only view it. Keys SHALL be in the URL fragment, which browsers do not send to servers.
 4. WHEN a user opens a share link THEN the system SHALL join that space with the matching permission and sync its events.
 5. THE sync server SHALL reject writes without the correct write key, requests for unknown spaces, and payloads over 256 KB. THE server SHALL store only a hash of the write key.
+6b. EACH app's Worker SHALL serve only the spaces created by that app, even when several apps share one database.
 6. WHEN a phone receives an event that cannot be decrypted or does not match its schema THEN the system SHALL ignore it in the projection and show the number of ignored events.
 7. THE skeleton SHALL let an app mark payload fields as **writers only**. These fields SHALL be encrypted with a second key derived from the write key, so that read-link holders cannot read them.
 8. THE README SHALL state the known limitations: anyone who has a link has its permission, a link cannot be revoked in this version, and losing all links means losing access to the space.

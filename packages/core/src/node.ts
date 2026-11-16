@@ -2,7 +2,6 @@
 // It uses the same schemas and encryption as the apps, so seeded data is
 // indistinguishable from data entered on a phone.
 
-import * as v from "valibot";
 import { randomBase64Url } from "./base64.ts";
 import { generateSecrets, importKeys, seal, writeKeyHash, type SpaceSecrets, type WritersOnlyFields } from "./crypto.ts";
 import type { Envelope } from "./event.ts";
@@ -44,7 +43,7 @@ export async function createRemoteSpace<M extends EventSchemas>(
         id: crypto.randomUUID(),
         space: secrets.space,
         type,
-        payload: v.parse(schema, payload),
+        payload: schema.parse(payload),
         ts,
         device: opts.device ?? defaultDevice,
       } as AppEvent<M>;

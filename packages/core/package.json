@@ -3,24 +3,28 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Rezote skeleton: offline-first storage, encrypted sync, status, and UI shell",
+  "description": "Rezote skeleton: offline-first storage, encrypted sync, status, and React UI shell",
   "exports": {
     ".": "./src/index.ts",
-    "./ui": "./src/ui/index.ts",
+    "./react": "./src/react/index.ts",
     "./node": "./src/node.ts",
     "./vite": {
       "types": "./vite.d.mts",
       "default": "./vite.mjs"
     },
-    "./styles.css": "./src/ui/styles.css"
+    "./styles.css": "./src/react/styles.css"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@preact/signals": "^2.11.4",
+    "@tanstack/react-store": "^0.11.2",
+    "@tanstack/store": "^0.11.2",
     "idb": "^8.0.4",
-    "preact": "^10.29.8",
-    "valibot": "^1.5.0"
+    "zod": "^4.6.7"
+  },
+  "peerDependencies": {
+    "react": "^19.2.0",
+    "@tanstack/react-router": "^1.170.0"
   }
 }

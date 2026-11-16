@@ -1,6 +1,6 @@
 import { canonical, type AppEvent } from "@rezote/core";
 import fc from "fast-check";
-import * as v from "valibot";
+import type { z } from "zod";
 import { describe, expect, it } from "vitest";
 import { events as schemas, fuelAmount, KINDS, type Kind, type RouteEvents } from "./events.ts";
 import { project, type RouteView } from "./project.ts";
@@ -11,8 +11,8 @@ const T0 = Date.UTC(2026, 10, 6, 5, 40);
 const H = 3_600_000;
 
 let seq = 0;
-function ev<K extends keyof RouteEvents & string>(type: K, payload: v.InferInput<RouteEvents[K]>, ts: number, extra: Partial<E> = {}): E {
-  return { id: `e${String(++seq).padStart(6, "0")}`, space: "S", type, payload: v.parse(schemas[type], payload), ts, device: "driver", ...extra } as E;
+function ev<K extends keyof RouteEvents & string>(type: K, payload: z.input<RouteEvents[K]>, ts: number, extra: Partial<E> = {}): E {
+  return { id: `e${String(++seq).padStart(6, "0")}`, space: "S", type, payload: schemas[type].parse(payload), ts, device: "driver", ...extra } as E;
 }
 
 const kinds = Object.keys(KINDS) as Kind[];

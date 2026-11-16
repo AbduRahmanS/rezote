@@ -71,12 +71,15 @@ export async function importKeys(secrets: SpaceSecrets): Promise<SpaceKeys> {
   return { space: secrets.space, encKey, writersKey };
 }
 
+/** Copies into a fresh ArrayBuffer-backed array, as Web Crypto requires. */
 function bytes(u: Uint8Array): Uint8Array<ArrayBuffer> {
-  return new Uint8Array(u);
+  const out = new Uint8Array(new ArrayBuffer(u.length)) as Uint8Array<ArrayBuffer>;
+  out.set(u);
+  return out;
 }
 
 function aad(e: Pick<Envelope, "id" | "space" | "ts" | "device">, suffix = ""): Uint8Array<ArrayBuffer> {
-  return enc.encode(`${e.id}|${e.space}|${e.ts}|${e.device}${suffix}`);
+  return bytes(enc.encode(`${e.id}|${e.space}|${e.ts}|${e.device}${suffix}`));
 }
 
 async function encrypt(key: CryptoKey, plain: string, additionalData: Uint8Array<ArrayBuffer>) {

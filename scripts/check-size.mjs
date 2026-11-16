@@ -6,7 +6,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { gzipSync } from "node:zlib";
 
-const BUDGET = 150 * 1024;
+const BUDGET = 250 * 1024;
 const COUNTED = /\.(html|js|mjs|css|svg|png|webmanifest|json)$/;
 
 function files(dir) {

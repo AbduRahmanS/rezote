@@ -1,8 +1,9 @@
-// Creates one demo space per app on a sync server and prints the share links.
+// Creates one demo space per app and prints the share links. Each app's Worker
+// serves its own sync API under /api, so the seed talks to the app URLs.
 // Data goes through the same schemas and encryption as on a phone.
 //
-//   npm run seed:demo -- --server https://rezote-sync.example.workers.dev \
-//     --collecte https://collecte.example.pages.dev --route https://carnet.example.pages.dev
+//   npm run seed:demo -- --collecte https://rezote-collecte.example.workers.dev \
+//     --route https://rezote-carnet.example.workers.dev
 //
 // Figures come from docs/research.md. Names and villages are illustrative.
 
@@ -17,9 +18,8 @@ function arg(name: string, fallback: string): string {
   return i > 0 && process.argv[i + 1] ? process.argv[i + 1]! : fallback;
 }
 
-const SERVER = arg("server", "http://127.0.0.1:8787");
-const COLLECTE_URL = arg("collecte", "http://localhost:5173/");
-const ROUTE_URL = arg("route", "http://localhost:5174/");
+const COLLECTE_URL = arg("collecte", "http://localhost:5173").replace(/\/$/, "");
+const ROUTE_URL = arg("route", "http://localhost:5174").replace(/\/$/, "");
 
 /** Deterministic pseudo-random numbers, so the demo is the same every time. */
 function rng(seed: number) {
@@ -38,7 +38,7 @@ const H = 60 * MIN;
 const DAY = 24 * H;
 
 async function seedCollecte() {
-  const space = await createRemoteSpace(collecte, SERVER);
+  const space = await createRemoteSpace(collecte, `${COLLECTE_URL}/api`);
   const treasurer = "demo-treasurer";
   const day0 = Date.UTC(2026, 10, 3, 8, 0); // weighing sessions start on Nov 3, 2026, 08:00 GMT (Mali time)
   let ts = day0 - DAY;
@@ -171,11 +171,11 @@ async function seedCollecte() {
   }
 
   const sent = await space.flush();
-  return { sent, links: space.links(COLLECTE_URL) };
+  return { sent, links: space.links(`${COLLECTE_URL}/`) };
 }
 
 async function seedRoute() {
-  const space = await createRemoteSpace(carnetDeRoute, SERVER);
+  const space = await createRemoteSpace(carnetDeRoute, `${ROUTE_URL}/api`);
   const owner = "demo-owner";
   const driver = "demo-driver";
   await space.emit("route/truck.registered", { plate: "AB-1234-MD", name: "Renault Kerax rouge" }, { ts: Date.UTC(2026, 10, 1, 9), device: owner });
@@ -269,9 +269,9 @@ async function seedRoute() {
   }
 
   const sent = await space.flush();
-  return { sent, links: space.links(ROUTE_URL) };
+  return { sent, links: space.links(`${ROUTE_URL}/`) };
 }
 
 const c = await seedCollecte();
 const r = await seedRoute();
-console.log(JSON.stringify({ server: SERVER, collecte: c, carnetDeRoute: r }, null, 2));
+console.log(JSON.stringify({ collecte: c, carnetDeRoute: r }, null, 2));
