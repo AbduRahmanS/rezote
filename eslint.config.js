@@ -30,6 +30,6 @@ export default tseslint.config(
   },
   {
     files: ["**/*.mjs", "**/*.js"],
-    languageOptions: { globals: { console: "readonly", process: "readonly", URL: "readonly", Buffer: "readonly" } },
+    languageOptions: { globals: { console: "readonly", process: "readonly", URL: "readonly", Buffer: "readonly", crypto: "readonly", TextEncoder: "readonly", btoa: "readonly" } },
   },
 );

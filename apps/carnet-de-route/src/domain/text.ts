@@ -8,6 +8,12 @@ export function corridorLabel(c: string): string {
   return (CORRIDORS as Record<string, string>)[c] ?? c;
 }
 
+/** "via Pogo–Zégoua", or the full label for "other". */
+export function corridorVia(c: string): string {
+  const via = corridorLabel(c).split(" via ")[1];
+  return via ? `via ${via}` : corridorLabel(c);
+}
+
 export function tripSummary(view: RouteView, trip: Trip, now = Date.now()): string {
   const lines: string[] = [];
   const truck = view.truck ? `Camion ${view.truck.plate}` : "Camion";

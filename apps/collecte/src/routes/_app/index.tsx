@@ -1,7 +1,12 @@
 import { formatDate, formatFCFA, formatKg, formatTime, formatTonnes } from "@rezote/core";
-import { Empty, GhostMark, Section, Stat, useCanWrite, useGhosts } from "@rezote/core/react";
+import { Empty, GhostMark, List, ListItem, PageHeader, Section, Stat, StatGrid, useGhosts } from "@rezote/core/react";
+import { Alert, AlertDescription, AlertTitle } from "@rezote/ui/components/alert";
+import { Badge } from "@rezote/ui/components/badge";
+import { Button } from "@rezote/ui/components/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@rezote/ui/components/table";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { pct } from "../../components/format.ts";
+import { ChevronRight, ReceiptText, Scale, TriangleAlert } from "lucide-react";
+import { pct, plural } from "../../components/format.ts";
 import { app, useRole, useView } from "../../runtime.ts";
 
 export const Route = createFileRoute("/_app/")({ component: Home });
@@ -13,93 +18,95 @@ function Home() {
 
 function Dashboard() {
   const view = useView();
-  const writable = useCanWrite(app);
   const { totals, campaign } = view;
   return (
     <div>
-      <h1>{campaign!.name}</h1>
-      <p className="muted">
-        {campaign!.cooperative} · {campaign!.product} · {campaign!.grades.map((g) => `${g.label} ${g.pricePerKg} F/kg`).join(" · ")}
-      </p>
+      <PageHeader title={campaign!.name} description={`${campaign!.cooperative} · ${campaign!.product}`} />
+      <div className="-mt-2 mb-4 flex flex-wrap gap-1.5">
+        {campaign!.grades.map((g) => (
+          <Badge key={g.code} variant="outline" className="font-normal tabular-nums">
+            {g.label} · {g.pricePerKg} F/kg
+          </Badge>
+        ))}
+      </div>
 
-      <div className="stats">
-        <Stat label="Pesé au village" value={formatTonnes(totals.weighedG)} />
+      {view.flags.length > 0 && (
+        <Alert className="mb-4 border-warning/60 bg-warning-soft text-warning-foreground">
+          <TriangleAlert aria-hidden />
+          <AlertTitle>
+            {view.flags.length} alerte{view.flags.length > 1 ? "s" : ""} à vérifier
+          </AlertTitle>
+          <AlertDescription className="text-warning-foreground/90">
+            <Link to="/flags" className="font-medium underline underline-offset-4">
+              Voir les alertes
+            </Link>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <StatGrid>
+        <Stat label="Pesé au village" value={formatTonnes(totals.weighedG)} hint={plural(totals.bundles, "bâche")} />
         <Stat label="Reste au magasin" value={formatTonnes(totals.inStoreG)} tone={totals.inStoreG < 0 ? "bad" : undefined} />
         <Stat label="Montant brut" value={formatFCFA(totals.gross)} />
-        <Stat label="Reste à payer" value={formatFCFA(totals.balance)} tone={totals.balance > 0 ? "warn" : "ok"} />
+        <Stat label="Reste à payer" value={formatFCFA(totals.balance)} tone={totals.balance > 0 ? "warn" : "ok"} hint={`Payé ${formatFCFA(totals.paid)}`} />
         <Stat
-          label="Écart usine"
-          value={totals.gapPct === null ? "–" : `${formatKg(totals.gapG)} (${pct(totals.gapPct)})`}
+          label="Écart à l'usine"
+          value={totals.gapPct === null ? "–" : pct(totals.gapPct)}
+          hint={totals.gapPct === null ? "Aucun chargement pesé" : formatKg(totals.gapG)}
           tone={totals.gapPct !== null && totals.gapPct < -1 ? "bad" : undefined}
         />
-        <Stat label="Alertes" value={view.flags.length} tone={view.flags.length ? "warn" : "ok"} />
-      </div>
-
-      <div className="grid-buttons">
-        <Link className="btn" to="/farmers">
-          <span className="emoji">👨🏾‍🌾</span>Producteurs
-        </Link>
-        <Link className="btn" to="/collectors">
-          <span className="emoji">⚖️</span>Collecteurs
-        </Link>
-        <Link className="btn" to="/loads">
-          <span className="emoji">🚚</span>Chargements
-        </Link>
-        <Link className="btn" to="/flags">
-          <span className="emoji">⚠️</span>Alertes
-        </Link>
-        <Link className="btn" to="/export">
-          <span className="emoji">📄</span>Export
-        </Link>
-        <Link className="btn" to="/role">
-          <span className="emoji">👤</span>Rôle
-        </Link>
-      </div>
+        <Stat label="Producteurs" value={view.farmers.length} hint={`${view.byVillage.length} village${view.byVillage.length > 1 ? "s" : ""}`} />
+      </StatGrid>
 
       <Section title="Par village">
         {view.byVillage.length === 0 ? (
           <Empty>Aucun producteur pour le moment.</Empty>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Village</th>
-                <th className="num">Prod.</th>
-                <th className="num">Poids</th>
-                <th className="num">Reste à payer</th>
-              </tr>
-            </thead>
-            <tbody>
-              {view.byVillage.map((v) => (
-                <tr key={v.village}>
-                  <td>{v.village}</td>
-                  <td className="num">{v.farmers}</td>
-                  <td className="num">{formatKg(v.totalG)}</td>
-                  <td className="num">{formatFCFA(v.balance)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="overflow-hidden rounded-lg border bg-card">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Village</TableHead>
+                  <TableHead className="text-right">Poids</TableHead>
+                  <TableHead className="text-right">Reste à payer</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {view.byVillage.map((v) => (
+                  <TableRow key={v.village}>
+                    <TableCell>
+                      <div className="font-medium">{v.village}</div>
+                      <div className="text-xs text-muted-foreground">{plural(v.farmers, "producteur")}</div>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{formatKg(v.totalG)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatFCFA(v.balance)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </Section>
 
       <Section title="Par collecteur">
-        <table>
-          <tbody>
+        {view.byCollector.length === 0 ? (
+          <Empty>
+            Aucun collecteur. <Link to="/collectors" className="font-medium text-foreground underline underline-offset-4">Ajouter</Link>
+          </Empty>
+        ) : (
+          <List>
             {view.byCollector.map((c) => (
-              <tr key={c.collector.id}>
-                <td>
-                  {c.collector.name} ({c.collector.code})
-                </td>
-                <td className="num">{c.weighings} reçus</td>
-                <td className="num">{c.bundles} bâches</td>
-                <td className="num">{formatKg(c.totalG)}</td>
-              </tr>
+              <li key={c.collector.id}>
+                <ListItem
+                  title={c.collector.name}
+                  subtitle={`${c.collector.code} · ${plural(c.weighings, "reçu")} · ${plural(c.bundles, "bâche")}`}
+                  end={<span className="font-medium">{formatKg(c.totalG)}</span>}
+                />
+              </li>
             ))}
-          </tbody>
-        </table>
+          </List>
+        )}
       </Section>
-      {!writable && <p className="muted small">Vue de consultation.</p>}
     </div>
   );
 }
@@ -119,74 +126,78 @@ function CollectorHome({ collectorId }: { collectorId: string }) {
   const open = mine.filter((w) => !w.closedAt && !w.cancelled);
   const pending = mine.filter((w) => [w.eventId, ...w.bundles.map((b) => b.eventId)].some((id) => ghosts.has(id))).length;
 
-  if (!me) return <Empty>Collecteur introuvable. Choisissez votre nom dans « Rôle ».</Empty>;
+  if (!me) return <Empty>Collecteur introuvable. Choisissez votre nom dans Plus → Changer de rôle.</Empty>;
   return (
     <div>
-      <h1>Bonjour {me.name.split(" ")[0]}</h1>
-      <p className="muted">
-        Code {me.code} · {view.campaign!.name}
-      </p>
-      <div className="stats">
-        <Stat label="Pesé aujourd'hui" value={formatKg(today.reduce((s, w) => s + w.totalG, 0))} />
-        <Stat label="Reçus aujourd'hui" value={today.length} />
-        <Stat label="Bâches aujourd'hui" value={today.reduce((s, w) => s + w.bundleCount, 0)} />
-        <Stat label="Pas encore envoyés" value={pending ? `👻 ${pending}` : "0"} tone={pending ? "warn" : "ok"} />
-      </div>
+      <PageHeader title={`Bonjour ${me.name.split(" ")[0]}`} description={`Code ${me.code} · ${view.campaign!.name}`} />
 
-      <Link className="btn primary block" to="/farmers" search={{ pick: true }}>
-        ⚖️ Nouvelle pesée
-      </Link>
+      <Button asChild size="lg" className="h-12 w-full text-base">
+        <Link to="/farmers" search={{ pick: true }}>
+          <Scale aria-hidden />
+          Nouvelle pesée
+        </Link>
+      </Button>
+
+      <StatGrid className="mt-4">
+        <Stat label="Pesé aujourd'hui" value={formatKg(today.reduce((s, w) => s + w.totalG, 0))} />
+        <Stat label="Reçus aujourd'hui" value={today.length} hint={plural(today.reduce((s, w) => s + w.bundleCount, 0), "bâche")} />
+      </StatGrid>
+      {pending > 0 && (
+        <p className="mt-2 text-sm text-warning-foreground">
+          {pending} reçu{pending > 1 ? "s" : ""} pas encore envoyé{pending > 1 ? "s" : ""} au trésorier. Ils partiront dès qu'il y aura du réseau.
+        </p>
+      )}
 
       {open.length > 0 && (
         <Section title="Pesées en cours">
-          <ul className="list">
+          <List>
             {open.map((w) => (
               <li key={w.id}>
-                <Link className="row" to="/weighings/$weighingId" params={{ weighingId: w.id }}>
-                  <span className="row-main">
-                    <span className="row-title">{view.farmerById.get(w.farmerId)?.name ?? "?"}</span>
-                    <span className="row-sub">
-                      {w.receipt} · {w.bundleCount} bâches
-                    </span>
-                  </span>
-                  <span className="row-end">{formatKg(w.totalG)}</span>
+                <Link to="/weighings/$weighingId" params={{ weighingId: w.id }} className="block hover:bg-accent">
+                  <ListItem
+                    icon={Scale}
+                    title={view.farmerById.get(w.farmerId)?.name ?? "?"}
+                    subtitle={`${w.receipt} · ${plural(w.bundleCount, "bâche")}`}
+                    end={<span className="font-medium">{formatKg(w.totalG)}</span>}
+                    chevron
+                  />
                 </Link>
               </li>
             ))}
-          </ul>
+          </List>
         </Section>
       )}
 
       <Section title="Mes reçus">
-        {mine.length === 0 && <Empty>Aucune pesée pour le moment.</Empty>}
-        <ul className="list">
-          {mine.slice(0, 30).map((w) => (
-            <li key={w.id}>
-              <Link className={`row ${w.cancelled ? "cancelled" : ""}`} to="/receipts/$weighingId" params={{ weighingId: w.id }}>
-                <span className="row-main">
-                  <span className="row-title">
-                    {view.farmerById.get(w.farmerId)?.name ?? "?"}
-                    <GhostMark app={app} id={[w.eventId, ...w.bundles.map((b) => b.eventId)]} />
-                  </span>
-                  <span className="row-sub">
-                    {w.receipt} · {formatDate(w.at)} {formatTime(w.at)}
-                  </span>
-                </span>
-                <span className="row-end">{formatKg(w.totalG)}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        {mine.length === 0 ? (
+          <Empty icon={ReceiptText}>Aucune pesée pour le moment.</Empty>
+        ) : (
+          <List>
+            {mine.slice(0, 30).map((w) => (
+              <li key={w.id}>
+                <Link to="/receipts/$weighingId" params={{ weighingId: w.id }} className="block hover:bg-accent">
+                  <ListItem
+                    className={w.cancelled ? "opacity-50 line-through" : ""}
+                    title={
+                      <>
+                        <span className="truncate">{view.farmerById.get(w.farmerId)?.name ?? "?"}</span>
+                        <GhostMark app={app} id={[w.eventId, ...w.bundles.map((b) => b.eventId)]} compact />
+                      </>
+                    }
+                    subtitle={`${w.receipt} · ${formatDate(w.at)} ${formatTime(w.at)}`}
+                    end={<span className="font-medium">{formatKg(w.totalG)}</span>}
+                  />
+                </Link>
+              </li>
+            ))}
+          </List>
+        )}
       </Section>
-
-      <div className="btn-row">
-        <Link className="btn" to="/farmers">
-          Producteurs
+      <p className="mt-6 text-center">
+        <Link to="/farmers" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          Tous les producteurs <ChevronRight className="size-4" aria-hidden />
         </Link>
-        <Link className="btn" to="/role">
-          Changer de rôle
-        </Link>
-      </div>
+      </p>
     </div>
   );
 }

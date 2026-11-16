@@ -16,6 +16,7 @@ import { Route as AppCollectorsRouteImport } from './routes/_app/collectors'
 import { Route as AppExportRouteImport } from './routes/_app/export'
 import { Route as AppFlagsRouteImport } from './routes/_app/flags'
 import { Route as AppLoadsRouteImport } from './routes/_app/loads'
+import { Route as AppMoreRouteImport } from './routes/_app/more'
 import { Route as AppRoleRouteImport } from './routes/_app/role'
 import { Route as ApiSplatRouteImport } from './routes/api/$'
 import { Route as AppFarmersIndexRouteImport } from './routes/_app/farmers/index'
@@ -57,6 +58,11 @@ const AppFlagsRoute = AppFlagsRouteImport.update({
 const AppLoadsRoute = AppLoadsRouteImport.update({
   id: '/loads',
   path: '/loads',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMoreRoute = AppMoreRouteImport.update({
+  id: '/more',
+  path: '/more',
   getParentRoute: () => AppRoute,
 } as any)
 const AppRoleRoute = AppRoleRouteImport.update({
@@ -107,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/export': typeof AppExportRoute
   '/flags': typeof AppFlagsRoute
   '/loads': typeof AppLoadsRoute
+  '/more': typeof AppMoreRoute
   '/role': typeof AppRoleRoute
   '/api/$': typeof ApiSplatRoute
   '/farmers/$farmerId': typeof AppFarmersFarmerIdRoute
@@ -122,6 +129,7 @@ export interface FileRoutesByTo {
   '/export': typeof AppExportRoute
   '/flags': typeof AppFlagsRoute
   '/loads': typeof AppLoadsRoute
+  '/more': typeof AppMoreRoute
   '/role': typeof AppRoleRoute
   '/api/$': typeof ApiSplatRoute
   '/': typeof AppIndexRoute
@@ -140,6 +148,7 @@ export interface FileRoutesById {
   '/_app/export': typeof AppExportRoute
   '/_app/flags': typeof AppFlagsRoute
   '/_app/loads': typeof AppLoadsRoute
+  '/_app/more': typeof AppMoreRoute
   '/_app/role': typeof AppRoleRoute
   '/api/$': typeof ApiSplatRoute
   '/_app/': typeof AppIndexRoute
@@ -159,6 +168,7 @@ export interface FileRouteTypes {
     | '/export'
     | '/flags'
     | '/loads'
+    | '/more'
     | '/role'
     | '/api/$'
     | '/farmers/$farmerId'
@@ -174,6 +184,7 @@ export interface FileRouteTypes {
     | '/export'
     | '/flags'
     | '/loads'
+    | '/more'
     | '/role'
     | '/api/$'
     | '/'
@@ -191,6 +202,7 @@ export interface FileRouteTypes {
     | '/_app/export'
     | '/_app/flags'
     | '/_app/loads'
+    | '/_app/more'
     | '/_app/role'
     | '/api/$'
     | '/_app/'
@@ -259,6 +271,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppLoadsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/more': {
+      id: '/_app/more'
+      path: '/more'
+      fullPath: '/more'
+      preLoaderRoute: typeof AppMoreRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/role': {
       id: '/_app/role'
       path: '/role'
@@ -323,6 +342,7 @@ interface AppRouteChildren {
   AppExportRoute: typeof AppExportRoute
   AppFlagsRoute: typeof AppFlagsRoute
   AppLoadsRoute: typeof AppLoadsRoute
+  AppMoreRoute: typeof AppMoreRoute
   AppRoleRoute: typeof AppRoleRoute
   AppIndexRoute: typeof AppIndexRoute
   AppFarmersFarmerIdRoute: typeof AppFarmersFarmerIdRoute
@@ -338,6 +358,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppExportRoute: AppExportRoute,
   AppFlagsRoute: AppFlagsRoute,
   AppLoadsRoute: AppLoadsRoute,
+  AppMoreRoute: AppMoreRoute,
   AppRoleRoute: AppRoleRoute,
   AppIndexRoute: AppIndexRoute,
   AppFarmersFarmerIdRoute: AppFarmersFarmerIdRoute,

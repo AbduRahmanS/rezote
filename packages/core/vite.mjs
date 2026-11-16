@@ -5,6 +5,7 @@
 
 import { cloudflare } from "@cloudflare/vite-plugin";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+import tailwindcss from "@tailwindcss/vite";
 import viteReact from "@vitejs/plugin-react";
 
 /**
@@ -19,7 +20,12 @@ export function rezoteConfig(app = {}) {
       // phone's IndexedDB. The build prerenders a shell at /_shell.html.
       tanstackStart({ spa: { enabled: true } }),
       viteReact(),
+      tailwindcss(),
     ],
+    // One copy of React, and the UI libraries pre-bundled up front, so the dev
+    // server never re-optimizes mid-session and loads a second React.
+    resolve: { dedupe: ["react", "react-dom"] },
+    optimizeDeps: { include: ["react", "react-dom", "react-dom/client", "sonner", "radix-ui", "lucide-react", "zod", "@tanstack/react-form", "@tanstack/react-store"] },
     server: { port: app.port, host: true },
     preview: { port: app.port, host: true },
   };

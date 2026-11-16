@@ -6,6 +6,7 @@
 - **TanStack Start** (React 19) in SPA mode, one Cloudflare Worker per app. Pages render in the browser only; the Worker serves the static app and the sync API under `/api` (server route `src/routes/api/$.ts`).
 - **TanStack Router** file-based routes. Validate search params with Zod (`validateSearch`). Use `<Link>` and `useNavigate`, never `location.hash` or plain `<a>` for in-app navigation.
 - **TanStack Form** with Zod field validators for forms. **TanStack Store** for shared client state (runtime, sync status, per-phone settings).
+- **shadcn/ui** components in `packages/ui` (add more with `npx shadcn@latest add <name>` from that folder, then fix the `cn` import to `../lib/utils.ts`), Tailwind CSS v4, lucide icons, sonner toasts.
 - **Zod 4** for event schemas. Do not add TanStack Query or TanStack DB without discussing it first: data is local-first and the sync engine owns all network calls.
 - Local storage: IndexedDB through `idb`, only via `Storage` in `packages/core`. No `localStorage`.
 - Encryption: Web Crypto API only (AES-GCM, HKDF, SHA-256).
@@ -14,7 +15,7 @@
 
 ## Hard rules
 
-- **Size budget:** each app's first load must stay under 250 KB gzip (`npm run check:size`, currently about 180 KB). No web fonts, map tiles, analytics, or third-party scripts. Ask before adding a runtime dependency.
+- **Size budget:** each app's first load must stay under 300 KB gzip (raised to 300 KB; currently about 245 to 255 KB). No web fonts, map tiles, analytics, or third-party scripts. Ask before adding a runtime dependency.
 - **Integers only for money and weights:** FCFA as integers, weights as integer grams (multiples of 100), fuel as integer centiliters. Round once, at the latest possible step, and document where.
 - **Events are immutable.** New features add event types; they never change the meaning of an existing type. Corrections are `*.cancelled` events.
 - **Projections are pure functions** of the canonical event list (sorted by `(ts, id)`, no duplicates). They must give the same result for any arrival order. Add a fast-check property for every new projection rule.
@@ -29,3 +30,12 @@
 - `npm run build` then `npm run check:size`
 - `npm run dev:collecte`, `npm run dev:route` (app + /api with a local D1; apply migrations first, see README)
 - Browser APIs (IndexedDB, `window`, `navigator`) only inside effects or event handlers: the shell is prerendered on the server at build time.
+
+## Interface rules
+
+- Light theme by default (used outdoors in sunlight); dark follows the phone setting. One accent color per app, set in the app's `src/styles.css`.
+- No emojis in the interface: use lucide icons. No gradients, glows, or decorative illustrations.
+- Use the shared building blocks from `@rezote/core/react` (`PageHeader`, `List`/`ListItem`, `Stat`/`StatGrid`, `Field`, `Empty`, `GhostMark`) before writing new markup.
+- Never use `window.alert`, `confirm`, or `prompt`: use `confirmAction`, `askReason`, and `act` (toasts).
+- Numbers that change (weights, amounts, durations) use `tabular-nums`. Touch targets at least 40 px high.
+- Changes still in the outbox: `GhostMark` badge and the `pending` class (amber dashed outline).

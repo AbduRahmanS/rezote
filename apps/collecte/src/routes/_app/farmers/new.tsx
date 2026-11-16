@@ -1,4 +1,6 @@
-import { act, BackLink, Field } from "@rezote/core/react";
+import { act, Field, PageHeader } from "@rezote/core/react";
+import { Button } from "@rezote/ui/components/button";
+import { Input } from "@rezote/ui/components/input";
 import { useForm } from "@tanstack/react-form";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
@@ -26,24 +28,24 @@ function AddFarmer() {
   });
   return (
     <form
+      className="grid gap-4"
       onSubmit={(e) => {
         e.preventDefault();
         void form.handleSubmit();
       }}
     >
-      <BackLink to="/farmers" />
-      <h1>Nouveau producteur</h1>
+      <PageHeader title="Nouveau producteur" back={{ to: "/farmers", search: pick ? { pick: true } : undefined }} />
       <form.Field name="name" validators={{ onChange: z.string().trim().min(1, "Le nom est obligatoire").max(80) }}>
         {(field) => (
-          <Field label="Nom du chef d'exploitation" errors={field.state.meta.errors}>
-            <input value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} onBlur={field.handleBlur} placeholder="Moussa Coulibaly" />
+          <Field label="Chef d'exploitation" errors={field.state.meta.errors}>
+            <Input autoComplete="off" value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} onBlur={field.handleBlur} placeholder="Moussa Coulibaly" />
           </Field>
         )}
       </form.Field>
       <form.Field name="village" validators={{ onChange: z.string().trim().min(1, "Le village est obligatoire").max(60) }}>
         {(field) => (
           <Field label="Village" errors={field.state.meta.errors}>
-            <input list="villages" value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} onBlur={field.handleBlur} />
+            <Input list="villages" value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} onBlur={field.handleBlur} />
             <datalist id="villages">
               {villages.map((v) => (
                 <option key={v} value={v} />
@@ -54,9 +56,9 @@ function AddFarmer() {
       </form.Field>
       <form.Subscribe selector={(s) => s.isSubmitting}>
         {(busy) => (
-          <button type="submit" className="btn primary block" disabled={busy}>
+          <Button type="submit" size="lg" disabled={busy}>
             {pick ? "Enregistrer et peser" : "Enregistrer"}
-          </button>
+          </Button>
         )}
       </form.Subscribe>
     </form>

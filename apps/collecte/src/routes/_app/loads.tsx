@@ -1,6 +1,11 @@
 import { formatDate, formatKg, parseKg } from "@rezote/core";
-import { act, askReason, BackLink, Empty, Field, GhostMark, NumberPad, Stat, useCanWrite, useGhosts } from "@rezote/core/react";
+import { act, askReason, Empty, Field, GhostMark, NumberPad, PageHeader, Stat, StatGrid, useCanWrite, useGhosts } from "@rezote/core/react";
+import { Badge } from "@rezote/ui/components/badge";
+import { Button } from "@rezote/ui/components/button";
+import { Input } from "@rezote/ui/components/input";
+import { cn } from "@rezote/ui/lib/utils";
 import { createFileRoute } from "@tanstack/react-router";
+import { Factory, Plus, Truck } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 import { pct } from "../../components/format.ts";
@@ -22,28 +27,35 @@ function LoadForm({ receivingId, onDone }: { receivingId: string | null; onDone:
   const submit = async () => {
     if (!grams) return;
     const ok = receiving
-      ? await act(() => app.emit("collecte/load.received", { loadId: receiving.id, factoryWeightG: grams, at: Date.now() }))
-      : await act(() => app.emit("collecte/load.dispatched", { loadId: newId(), plate, villageWeightG: grams, at: Date.now() }));
+      ? await act(() => app.emit("collecte/load.received", { loadId: receiving.id, factoryWeightG: grams, at: Date.now() }), "Poids usine enregistré")
+      : await act(() => app.emit("collecte/load.dispatched", { loadId: newId(), plate, villageWeightG: grams, at: Date.now() }), "Chargement enregistré");
     if (ok) onDone();
   };
   return (
     <div>
-      <h1>{receiving ? `Poids à l'usine · ${receiving.plate}` : "Nouveau chargement"}</h1>
-      {!receiving && (
-        <Field label="Immatriculation du camion">
-          <input maxLength={20} value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())} placeholder="AB-1234-MD" />
-        </Field>
-      )}
-      <p className="muted">{receiving ? `Poids au départ du village : ${formatKg(receiving.villageWeightG)}` : `Au magasin : ${formatKg(view.totals.inStoreG)}`}</p>
-      <div className="display">{weight || "0"} kg</div>
-      <NumberPad value={weight} onInput={setWeight} maxLength={7} />
-      <div className="btn-row">
-        <button type="button" className="btn" onClick={onDone}>
-          Annuler
-        </button>
-        <button type="button" className="btn primary" disabled={!grams || (!receiving && !plate.trim())} onClick={submit}>
-          Enregistrer
-        </button>
+      <PageHeader
+        title={receiving ? "Poids à l'usine" : "Nouveau chargement"}
+        description={receiving ? `${receiving.plate} · parti avec ${formatKg(receiving.villageWeightG)}` : `Au magasin : ${formatKg(view.totals.inStoreG)}`}
+      />
+      <div className="grid gap-3">
+        {!receiving && (
+          <Field label="Immatriculation du camion">
+            <Input className="font-mono uppercase" maxLength={20} value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())} placeholder="AB-1234-MD" />
+          </Field>
+        )}
+        <div className={cn("flex h-16 items-center justify-center gap-2 rounded-md bg-muted text-4xl font-semibold tabular-nums", !weight && "text-muted-foreground")}>
+          {weight || "0"}
+          <span className="text-lg font-medium text-muted-foreground">kg</span>
+        </div>
+        <NumberPad value={weight} onInput={setWeight} maxLength={7} />
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="outline" size="lg" onClick={onDone}>
+            Annuler
+          </Button>
+          <Button size="lg" disabled={!grams || (!receiving && !plate.trim())} onClick={submit}>
+            Enregistrer
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -59,64 +71,83 @@ function Loads() {
 
   if (mode) return <LoadForm receivingId={mode === "dispatch" ? null : mode} onDone={() => setMode(undefined)} />;
 
+  const { totals } = view;
   return (
     <div>
-      <BackLink />
-      <h1>Chargements</h1>
-      <div className="stats">
-        <Stat label="Pesé au village" value={formatKg(view.totals.weighedG)} />
-        <Stat label="Parti du magasin" value={formatKg(view.totals.dispatchedG)} />
-        <Stat label="Reste au magasin" value={formatKg(view.totals.inStoreG)} />
-        <Stat label="Écart usine" value={pct(view.totals.gapPct)} tone={view.totals.gapPct !== null && view.totals.gapPct < -1 ? "bad" : undefined} />
-      </div>
-      {writable && (
-        <button type="button" className="btn primary block" onClick={() => setMode("dispatch")}>
-          🚚 Nouveau chargement
-        </button>
-      )}
-      <ul className="list" style={{ marginTop: "1rem" }}>
-        {view.loads.map((l) => (
-          <li key={l.id}>
-            <div className={`card ${l.cancelled ? "cancelled" : ""} ${ghosts.has(l.eventId) ? "is-ghost" : ""}`}>
-              <div className="section-head">
-                <strong>
-                  {l.plate} · {formatDate(l.at)}
-                  <GhostMark app={app} id={[l.eventId, l.received?.eventId]} />
-                </strong>
-                <span>{formatKg(l.villageWeightG)}</span>
+      <PageHeader
+        title="Chargements"
+        description="Le poids au départ du village comparé au poids pesé à l'usine d'égrenage."
+        actions={
+          writable && (
+            <Button size="sm" onClick={() => setMode("dispatch")}>
+              <Plus aria-hidden />
+              Nouveau
+            </Button>
+          )
+        }
+      />
+      <StatGrid>
+        <Stat label="Pesé au village" value={formatKg(totals.weighedG)} />
+        <Stat label="Parti du magasin" value={formatKg(totals.dispatchedG)} />
+        <Stat label="Reste au magasin" value={formatKg(totals.inStoreG)} tone={totals.inStoreG < 0 ? "bad" : undefined} />
+        <Stat label="Écart à l'usine" value={pct(totals.gapPct)} hint={totals.gapPct === null ? undefined : formatKg(totals.gapG)} tone={totals.gapPct !== null && totals.gapPct < -1 ? "bad" : undefined} />
+      </StatGrid>
+
+      <div className="mt-4 grid gap-2">
+        {view.loads.length === 0 && <Empty icon={Truck}>Aucun chargement.</Empty>}
+        {view.loads.map((l) => {
+          const bad = l.gapPct !== null && l.gapPct < -1;
+          return (
+            <div key={l.id} className={cn("rounded-lg border bg-card p-3", l.cancelled && "opacity-60", ghosts.has(l.eventId) && "pending")}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 font-medium">
+                    <Truck className="size-4 text-muted-foreground" aria-hidden />
+                    <span className={cn("font-mono", l.cancelled && "line-through")}>{l.plate}</span>
+                    <GhostMark app={app} id={[l.eventId, l.received?.eventId]} compact />
+                  </div>
+                  <div className="mt-0.5 text-sm text-muted-foreground">Parti le {formatDate(l.at)}</div>
+                </div>
+                <div className="text-right font-semibold tabular-nums">{formatKg(l.villageWeightG)}</div>
               </div>
               {l.received ? (
-                <p className={l.gapPct !== null && l.gapPct < -1 ? "bad" : "muted"}>
-                  Usine : {formatKg(l.received.factoryWeightG)} · écart {formatKg(l.gapG!)} ({pct(l.gapPct)})
-                </p>
+                <div className="mt-2 flex items-center justify-between gap-2 border-t pt-2 text-sm">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <Factory className="size-4" aria-hidden />
+                    Usine : <span className="tabular-nums text-foreground">{formatKg(l.received.factoryWeightG)}</span>
+                  </span>
+                  <Badge variant={bad ? "destructive" : "secondary"} className="tabular-nums">
+                    écart {formatKg(l.gapG!)} ({pct(l.gapPct)})
+                  </Badge>
+                </div>
               ) : (
-                <p className="muted">Pas encore pesé à l'usine.</p>
+                !l.cancelled && <p className="mt-2 border-t pt-2 text-sm text-muted-foreground">Pas encore pesé à l'usine.</p>
               )}
-              {l.cancelled && <p className="bad">Annulé : {l.cancelled}</p>}
+              {l.cancelled && <p className="mt-2 text-sm text-destructive">Annulé : {l.cancelled}</p>}
               {writable && !l.cancelled && (
-                <div className="btn-row">
+                <div className="mt-2 flex gap-2">
                   {!l.received && (
-                    <button type="button" className="btn small" onClick={() => setMode(l.id)}>
+                    <Button size="sm" variant="outline" onClick={() => setMode(l.id)}>
                       Poids usine
-                    </button>
+                    </Button>
                   )}
-                  <button
-                    type="button"
-                    className="btn small danger"
-                    onClick={() => {
-                      const reason = askReason();
-                      if (reason) void act(() => app.emit("collecte/item.cancelled", { itemId: l.id, reason }));
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={async () => {
+                      const reason = await askReason("Annuler ce chargement ?");
+                      if (reason) await act(() => app.emit("collecte/item.cancelled", { itemId: l.id, reason }));
                     }}
                   >
                     Annuler
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
-          </li>
-        ))}
-      </ul>
-      {view.loads.length === 0 && <Empty>Aucun chargement.</Empty>}
+          );
+        })}
+      </div>
     </div>
   );
 }

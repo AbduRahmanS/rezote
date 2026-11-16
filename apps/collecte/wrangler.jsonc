@@ -5,7 +5,10 @@
   "name": "rezote-collecte",
   "compatibility_date": "2026-11-01",
   "compatibility_flags": ["nodejs_compat"],
-  "main": "@tanstack/react-start/server-entry",
+  // src/server.ts: serves the SPA shell with security headers, /api to the sync API.
+  "main": "./src/server.ts",
+  // The Worker reads the prerendered shell through this binding.
+  "assets": { "binding": "ASSETS" },
   "observability": { "enabled": true },
   // Served only on the custom domain. A single origin matters: data is stored per origin on the phone.
   "workers_dev": false,

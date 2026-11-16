@@ -1,13 +1,6 @@
+import { FullPageLoader } from "@rezote/core/react";
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
-
-function Pending() {
-  return (
-    <main className="main center">
-      <p className="muted">Chargement…</p>
-    </main>
-  );
-}
 
 export function getRouter() {
   return createRouter({
@@ -15,12 +8,8 @@ export function getRouter() {
     scrollRestoration: true,
     defaultPreload: "intent",
     // In SPA mode this is what the prerendered shell shows until the app starts.
-    defaultPendingComponent: Pending,
-    defaultNotFoundComponent: () => (
-      <main className="main">
-        <p className="empty">Page introuvable.</p>
-      </main>
-    ),
+    defaultPendingComponent: FullPageLoader,
+    defaultNotFoundComponent: () => <p className="py-10 text-center text-sm text-muted-foreground">Page introuvable.</p>,
   });
 }
 

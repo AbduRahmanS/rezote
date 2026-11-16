@@ -1,11 +1,16 @@
 import { formatFCFA, formatLiters, fromDateTimeInput, parseFCFA, parseLiters, toDateTimeInput, type PayloadOf } from "@rezote/core";
-import { act, BackLink, Empty, Field } from "@rezote/core/react";
+import { act, Empty, Field, PageHeader } from "@rezote/core/react";
+import { Button } from "@rezote/ui/components/button";
+import { Input } from "@rezote/ui/components/input";
+import { ToggleGroup, ToggleGroupItem } from "@rezote/ui/components/toggle-group";
 import { useForm } from "@tanstack/react-form";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Loader2, MapPin } from "lucide-react";
 import { z } from "zod";
+import { KIND_ICONS } from "../../../../components/kinds.ts";
+import { recentPlaces } from "../../../../components/trip.tsx";
 import { DIESEL_PRICES } from "../../../../domain/app.ts";
 import { fuelAmount, KINDS, RESUMABLE, type Kind, type RouteEvents } from "../../../../domain/events.ts";
-import { recentPlaces } from "../../../../components/trip.tsx";
 import { app, newId, readPosition, useGps, useView } from "../../../../runtime.ts";
 
 export const Route = createFileRoute("/_app/entry/$tripId/$kind")({ component: EntryForm });
@@ -28,8 +33,7 @@ function EntryForm() {
     onSubmit: async ({ value, formApi }) => {
       // The field has minute precision; keep the exact time unless the driver changed it.
       const at = formApi.getFieldMeta("when")?.isDirty ? fromDateTimeInput(value.when) : Date.now();
-      if (!at) return window.alert("Date invalide.");
-      if (at > Date.now() + 10 * 60_000) return window.alert("La date est dans le futur.");
+      if (!at || at > Date.now() + 10 * 60_000) return;
       const payload: PayloadOf<RouteEvents, "route/entry.recorded"> = { entryId: newId(), tripId, kind, place: value.place.trim(), at };
       if (isFuel) {
         payload.volumeCl = parseLiters(value.liters)!;
@@ -41,29 +45,37 @@ function EntryForm() {
       if (value.note.trim()) payload.note = value.note.trim();
       const position = await readPosition();
       if (position) payload.position = position;
-      if (await act(() => app.emit("route/entry.recorded", payload))) await navigate({ to: "/" });
+      if (await act(() => app.emit("route/entry.recorded", payload), `${KINDS[kind].label} enregistré`)) await navigate({ to: "/" });
     },
   });
 
   const info = KINDS[kind];
   if (!info) return <Empty>Type inconnu.</Empty>;
+  const Icon = KIND_ICONS[kind];
   const places = recentPlaces(view);
 
   return (
     <form
+      className="grid gap-4"
       onSubmit={(e) => {
         e.preventDefault();
         void form.handleSubmit();
       }}
     >
-      <BackLink />
-      <h1>
-        {info.emoji} {info.label}
-      </h1>
+      <PageHeader
+        title={
+          <span className="inline-flex items-center gap-2">
+            <Icon className="size-5 text-primary" aria-hidden />
+            {info.label}
+          </span>
+        }
+        back={{ to: "/" }}
+        description={RESUMABLE.has(kind) ? "Quand le camion repart, touchez « Reprendre la route » : la durée de l'arrêt sera calculée." : undefined}
+      />
       <form.Field name="place" validators={{ onSubmit: z.string().trim().min(1, "Le lieu est obligatoire").max(80) }}>
         {(field) => (
           <Field label="Lieu" errors={field.state.meta.errors}>
-            <input list="places" value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} placeholder="Zégoua" />
+            <Input list="places" value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} placeholder="Zégoua" />
             <datalist id="places">
               {places.map((p) => (
                 <option key={p} value={p} />
@@ -74,37 +86,32 @@ function EntryForm() {
       </form.Field>
 
       {isFuel ? (
-        <>
-          <div className="inline">
+        <div className="grid gap-3 rounded-lg border bg-card p-3">
+          <div className="grid grid-cols-2 gap-2">
             <form.Field name="liters" validators={{ onSubmit: liters }}>
               {(field) => (
                 <Field label="Litres" errors={field.state.meta.errors}>
-                  <input inputMode="decimal" value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} />
+                  <Input inputMode="decimal" className="tabular-nums" value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} />
                 </Field>
               )}
             </form.Field>
             <form.Field name="price" validators={{ onChange: pricePerLiter }}>
               {(field) => (
                 <Field label="Prix / litre" errors={field.state.meta.errors}>
-                  <input inputMode="numeric" value={field.state.value} onChange={(e) => field.handleChange(e.target.value.replace(/\D/g, ""))} />
+                  <Input inputMode="numeric" className="tabular-nums" value={field.state.value} onChange={(e) => field.handleChange(e.target.value.replace(/\D/g, ""))} />
                 </Field>
               )}
             </form.Field>
           </div>
           <form.Field name="price">
             {(field) => (
-              <div className="chips">
+              <ToggleGroup type="single" variant="outline" size="sm" className="w-full" value={field.state.value} onValueChange={(v) => v && field.handleChange(v)}>
                 {DIESEL_PRICES.map((d) => (
-                  <button
-                    type="button"
-                    key={d.country}
-                    className={`chip ${field.state.value === String(d.price) ? "active" : ""}`}
-                    onClick={() => field.handleChange(String(d.price))}
-                  >
+                  <ToggleGroupItem key={d.country} value={String(d.price)} className="flex-1 text-xs" aria-label={`${d.country} ${d.price}`}>
                     {d.country} {d.price}
-                  </button>
+                  </ToggleGroupItem>
                 ))}
-              </div>
+              </ToggleGroup>
             )}
           </form.Field>
           <form.Subscribe selector={(s) => [s.values.liters, s.values.price] as const}>
@@ -112,53 +119,61 @@ function EntryForm() {
               const cl = parseLiters(l);
               const ppl = Number(p);
               return (
-                <p className="center">
-                  <strong>{cl && ppl > 0 ? formatFCFA(fuelAmount(cl, ppl)) : "–"}</strong>
-                  {cl ? <span className="muted"> pour {formatLiters(cl)}</span> : null}
-                </p>
+                <div className="flex items-baseline justify-between border-t pt-3">
+                  <span className="text-sm text-muted-foreground">{cl ? `Total pour ${formatLiters(cl)}` : "Total"}</span>
+                  <span className="text-lg font-semibold tabular-nums">{cl && ppl > 0 ? formatFCFA(fuelAmount(cl, ppl)) : "–"}</span>
+                </div>
               );
             }}
           </form.Subscribe>
-        </>
+        </div>
       ) : (
         <form.Field name="amount" validators={{ onChange: optionalAmount }}>
           {(field) => (
             <Field label="Montant payé (FCFA)" hint="Laissez vide s'il n'y a rien à payer." errors={field.state.meta.errors}>
-              <input inputMode="numeric" value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} />
+              <Input inputMode="numeric" className="tabular-nums" value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} />
             </Field>
           )}
         </form.Field>
       )}
 
-      <form.Field name="odometer" validators={{ onChange: km }}>
-        {(field) => (
-          <Field label="Compteur (km)" hint={isFuel ? "Recommandé : permet de calculer la consommation." : "Facultatif."} errors={field.state.meta.errors}>
-            <input inputMode="numeric" value={field.state.value} onChange={(e) => field.handleChange(e.target.value.replace(/\D/g, ""))} />
-          </Field>
-        )}
-      </form.Field>
+      <div className="grid grid-cols-2 gap-2">
+        <form.Field name="odometer" validators={{ onChange: km }}>
+          {(field) => (
+            <Field label="Compteur (km)" hint={isFuel ? "Pour la consommation" : "Facultatif"} errors={field.state.meta.errors}>
+              <Input inputMode="numeric" className="tabular-nums" value={field.state.value} onChange={(e) => field.handleChange(e.target.value.replace(/\D/g, ""))} />
+            </Field>
+          )}
+        </form.Field>
+        <form.Field name="when">
+          {(field) => (
+            <Field label="Quand">
+              <Input type="datetime-local" value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} />
+            </Field>
+          )}
+        </form.Field>
+      </div>
       <form.Field name="note">
         {(field) => (
           <Field label="Note">
-            <input maxLength={300} value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} />
+            <Input maxLength={300} value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} placeholder="Facultatif" />
           </Field>
         )}
       </form.Field>
-      <form.Field name="when">
-        {(field) => (
-          <Field label="Quand">
-            <input type="datetime-local" value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} />
-          </Field>
-        )}
-      </form.Field>
-      {RESUMABLE.has(kind) && <p className="muted small">Quand le camion repart, appuyez sur « Reprendre la route » : la durée de l'arrêt sera calculée.</p>}
+
       <form.Subscribe selector={(s) => s.isSubmitting}>
         {(busy) => (
-          <button type="submit" className="btn primary block" disabled={busy}>
+          <Button type="submit" size="lg" disabled={busy}>
+            {busy && <Loader2 className="animate-spin" aria-hidden />}
             {busy && gps ? "Lecture du GPS…" : "Enregistrer"}
-          </button>
+          </Button>
         )}
       </form.Subscribe>
+      {gps && (
+        <p className="-mt-2 flex items-center justify-center gap-1 text-xs text-muted-foreground">
+          <MapPin className="size-3.5" aria-hidden /> La position du téléphone sera ajoutée.
+        </p>
+      )}
     </form>
   );
 }
