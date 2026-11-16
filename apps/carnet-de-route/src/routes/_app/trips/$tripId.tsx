@@ -9,7 +9,7 @@ import type { ReactNode } from "react";
 import { KIND_ICONS } from "../../../components/kinds.ts";
 import { LastReport, mapLink, OpenStops, TripTitle, useNow } from "../../../components/trip.tsx";
 import { KINDS, type Kind } from "../../../domain/events.ts";
-import { corridorVia, tripSummary } from "../../../domain/text.ts";
+import { corridorVia, deOrD, tripSummary } from "../../../domain/text.ts";
 import { app, useView } from "../../../runtime.ts";
 
 export const Route = createFileRoute("/_app/trips/$tripId")({ component: TripDetail });
@@ -51,7 +51,7 @@ function TimelineItem({
 
 function CancelButton({ itemId }: { itemId: string }) {
   return (
-    <Button variant="ghost" size="icon-sm" className="-mt-1 shrink-0 text-muted-foreground hover:text-destructive" aria-label="Annuler" onClick={() => void cancel(itemId)}>
+    <Button variant="ghost" size="icon-xs" className="shrink-0 text-muted-foreground hover:text-destructive" aria-label="Annuler" onClick={() => void cancel(itemId)}>
       <X aria-hidden />
     </Button>
   );
@@ -154,7 +154,7 @@ function TripDetail() {
             const last = i === timeline.length - 1;
             if (item.kind === "start")
               return (
-                <TimelineItem key="start" icon={Play} last={last} title={<>Départ de {trip.from} <GhostMark app={app} id={item.eventId} compact /></>} meta={`${formatDateTime(item.at)} · avance ${formatFCFA(trip.advance)}`} />
+                <TimelineItem key="start" icon={Play} last={last} title={<>Départ {deOrD(trip.from)} <GhostMark app={app} id={item.eventId} compact /></>} meta={`${formatDateTime(item.at)} · avance ${formatFCFA(trip.advance)}`} />
               );
             if (item.kind === "end")
               return <TimelineItem key="end" icon={Flag} last={last} title={<>Arrivée à {item.place} <GhostMark app={app} id={item.eventId} compact /></>} meta={formatDateTime(item.at)} />;

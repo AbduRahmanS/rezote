@@ -120,6 +120,11 @@
     @apply bg-background text-foreground font-sans antialiased;
     font-feature-settings: "cv11", "ss01";
   }
+  /* Grid and flex children may shrink below their content, so long text truncates instead of widening the page. */
+  .grid > *,
+  .flex > * {
+    min-width: 0;
+  }
   h1,
   h2,
   h3 {
