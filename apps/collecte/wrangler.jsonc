@@ -7,12 +7,15 @@
   "compatibility_flags": ["nodejs_compat"],
   "main": "@tanstack/react-start/server-entry",
   "observability": { "enabled": true },
+  // Served only on the custom domain. A single origin matters: data is stored per origin on the phone.
+  "workers_dev": false,
+  "routes": [{ "pattern": "collecte.abdrahamane.dev", "custom_domain": true }],
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "rezote",
-      // Replace with the ID printed by `npx wrangler d1 create rezote` (the same database for both apps).
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      // Shared by both apps (created with `npx wrangler d1 create rezote --location weur`).
+      "database_id": "065a45d9-9bf8-42c8-bf31-411ce1ab6178",
       "migrations_dir": "../../packages/sync-api/migrations"
     }
   ],

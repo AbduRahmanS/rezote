@@ -103,7 +103,7 @@ The submission deadline is December 4, 2026, 2:00 pm Pacific Time. Each task lis
   - `docs/deploy.md`: Cloudflare account, D1 database, deploying both app Workers, demo seed
   - _Requirements: 6.4, 7.8, 10.5_
 
-- [ ] 15. Deployment (done by you, following `docs/deploy.md`)
+- [x] 15. Deployment: collecte.abdrahamane.dev and carnet.abdrahamane.dev, D1 in WEUR, demo data seeded
   - One D1 database; both apps deployed as Cloudflare Workers (app + /api) with `npm run deploy -w <app>`
   - Run the demo seed against the deployed server
   - Manual test on two real phones: airplane mode, record data, reconnect, check the other phone

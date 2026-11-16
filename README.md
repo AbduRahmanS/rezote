@@ -9,7 +9,14 @@ Built for the Kiroween 2026 hackathon, **Skeleton Crew** category: one skeleton,
 | **Collecte** | [`apps/collecte`](apps/collecte) | Cotton cooperatives: collectors in the villages, the treasurer in town | Three paper notebooks per weighing session, and disputes over weights and payments |
 | **Carnet de route** | [`apps/carnet-de-route`](apps/carnet-de-route) | Truck drivers on the Dakar–Bamako and Abidjan–Bamako corridors, and truck owners | Phone calls and arguments about fuel, fees, and delays |
 
-Demo links: _added after deployment (see [docs/deploy.md](docs/deploy.md))._
+**Live apps:** [collecte.abdrahamane.dev](https://collecte.abdrahamane.dev) · [carnet.abdrahamane.dev](https://carnet.abdrahamane.dev)
+
+**Demo data (read-only links):**
+
+- [Collecte: a cotton campaign with 41 farmers, about 50 t weighed, 3 truckloads, and 3 flags](https://collecte.abdrahamane.dev/#s=oSSQJhlPV5DvqdY7ma6NTQ&e=wot4_-EZQ1AJ4y2xX9PEebeLVsHedbeg-gqHC6IfY7U)
+- [Carnet de route: a finished Abidjan → Bamako trip and a Dakar trip waiting at Moussala](https://carnet.abdrahamane.dev/#s=KMgC9oz_yW5FTZzpj_gI2g&e=A2JBdogwhZuGgCkT-4hTBNwAHM0EmZWNYzZTNMDHMHg)
+
+To try recording data, open an app and create your own campaign or truck. Turn on airplane mode to see the ghosts 👻, then turn it off to watch them sync.
 
 ## The problem
 
