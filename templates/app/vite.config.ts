@@ -1,0 +1,4 @@
+import { rezoteConfig } from "@rezote/core/vite";
+import { defineConfig } from "vite";
+
+export default defineConfig(rezoteConfig({ port: __PORT__ }));

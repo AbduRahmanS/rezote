@@ -8,6 +8,11 @@ export function corridorLabel(c: string): string {
   return (CORRIDORS as Record<string, string>)[c] ?? c;
 }
 
+/** French elision: "d'Abidjan", "de Dakar". */
+export function deOrD(place: string): string {
+  return /^[aeiouyhâàéèêëîïôöûüAEIOUYHÂÀÉÈÊËÎÏÔÖÛÜ]/.test(place) ? `d'${place}` : `de ${place}`;
+}
+
 /** "via Pogo–Zégoua", or the full label for "other". */
 export function corridorVia(c: string): string {
   const via = corridorLabel(c).split(" via ")[1];

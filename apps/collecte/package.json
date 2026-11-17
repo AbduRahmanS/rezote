@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "description": "Collecte: cooperative cotton weighing and farmer payments, offline-first",
+  "rezote": {
+    "accent": "#ff8a1f"
+  },
   "scripts": {
     "dev": "vite dev",
     "build": "vite build && node ../../scripts/build-sw.mjs dist/client",

@@ -33,9 +33,8 @@
 
 ## Interface rules
 
-- Light theme by default (used outdoors in sunlight); dark follows the phone setting. One accent color per app, set in the app's `src/styles.css`.
-- No emojis in the interface: use lucide icons. No gradients, glows, or decorative illustrations.
-- Use the shared building blocks from `@rezote/core/react` (`PageHeader`, `List`/`ListItem`, `Stat`/`StatGrid`, `Field`, `Empty`, `GhostMark`) before writing new markup.
-- Never use `window.alert`, `confirm`, or `prompt`: use `confirmAction`, `askReason`, and `act` (toasts).
-- Numbers that change (weights, amounts, durations) use `tabular-nums`. Touch targets at least 40 px high.
-- Changes still in the outbox: `GhostMark` badge and the `pending` class (amber dashed outline).
+In `ui.md`, which Kiro loads only when a screen, component, or theme file is in context.
+
+## New apps
+
+`npm run new-app -- <slug> "<Name>"` creates a working app from `templates/app` (spec: `.kiro/specs/new-app-command`, skill: `new-rezote-app`). Change the template, not a generated copy, when the starter itself must change; CI builds a fresh one on every push.

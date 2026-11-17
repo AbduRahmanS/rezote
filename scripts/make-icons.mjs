@@ -1,7 +1,7 @@
 // Generates the PWA icons (a small ghost: unsynced data waiting for the network)
 // as PNG files, with no image library. Run: node scripts/make-icons.mjs
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 
 const CRC_TABLE = new Uint32Array(256).map((_, n) => {
@@ -68,7 +68,15 @@ function ghost(accent) {
   };
 }
 
-const apps = { collecte: "#ff8a1f", "carnet-de-route": "#2dd4bf" };
+// Every app folder that declares "rezote": { "accent": "#rrggbb" } in its package.json.
+const appsDir = new URL("../apps/", import.meta.url);
+const apps = {};
+for (const name of readdirSync(appsDir)) {
+  const pkg = new URL(`${name}/package.json`, appsDir);
+  if (!existsSync(pkg)) continue;
+  const accent = JSON.parse(readFileSync(pkg, "utf8")).rezote?.accent;
+  if (/^#[0-9a-f]{6}$/i.test(accent ?? "")) apps[name] = accent;
+}
 for (const [name, accent] of Object.entries(apps)) {
   const dir = new URL(`../apps/${name}/public/`, import.meta.url);
   mkdirSync(dir, { recursive: true });
@@ -78,4 +86,4 @@ for (const [name, accent] of Object.entries(apps)) {
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="18" fill="#0e0f13"/><path d="M29 48a21 21 0 0 1 42 0v26l-7-4-7 4-7-4-7 4-7-4-7 4z" fill="${accent}"/><ellipse cx="43" cy="46" rx="3.3" ry="5" fill="#0e0f13"/><ellipse cx="57" cy="46" rx="3.3" ry="5" fill="#0e0f13"/></svg>\n`,
   );
 }
-console.log("Icons written to apps/*/public/");
+console.log(`Icons written for: ${Object.keys(apps).join(", ")}`);

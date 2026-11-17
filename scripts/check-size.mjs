@@ -1,8 +1,9 @@
 // Fails if an app's first load is over budget. It gzips every file the browser
 // downloads on the first visit (HTML, JS, CSS, icons, manifest, service worker)
-// and adds up the sizes. Usage: node scripts/check-size.mjs apps/collecte/dist [...]
+// and adds up the sizes. Usage: node scripts/check-size.mjs [apps/<app>/dist/client ...]
+// With no arguments it checks every app in apps/.
 
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { gzipSync } from "node:zlib";
 
@@ -16,9 +17,10 @@ function files(dir) {
   });
 }
 
-const dirs = process.argv.slice(2);
-if (dirs.length === 0) {
-  console.error("Usage: node scripts/check-size.mjs <dist dir> [...]");
+const dirs = process.argv.length > 2 ? process.argv.slice(2) : readdirSync("apps").map((app) => join("apps", app, "dist", "client"));
+const missing = dirs.filter((dir) => !existsSync(dir));
+if (missing.length > 0) {
+  console.error(`Not built: ${missing.join(", ")}. Run npm run build first.`);
   process.exit(2);
 }
 

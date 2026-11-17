@@ -5,7 +5,8 @@ import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["**/dist/**", "**/node_modules/**", "**/.wrangler/**", "**/.tanstack/**", "**/routeTree.gen.ts"] },
+  // templates/ holds placeholders that only parse once filled in; CI lints the generated app instead.
+  { ignores: ["**/dist/**", "**/node_modules/**", "**/.wrangler/**", "**/.tanstack/**", "**/routeTree.gen.ts", "templates/**"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   ...pluginRouter.configs["flat/recommended"],

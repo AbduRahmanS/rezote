@@ -1,6 +1,10 @@
 # Rezote 👻
 
-**Rezote** (from Bambara *rezo tɛ*, "no network") is a template for web apps that keep working where the mobile network is weak or absent, as in villages and on the roads of Mali and West Africa. Every action is saved on the phone first. Changes that have not reached the server yet are shown as ghosts 👻 and come back to life on the server when the network returns. Everything is encrypted on the phone, so the server stores data it cannot read.
+**Rezote** (from Bambara *rezo tɛ*, "no network") is a template for web apps that keep working where the mobile network is weak or absent, as in villages and on the roads of Mali and West Africa. Every action is saved on the phone first. Changes that have not reached the server yet are marked as ghosts (a ghost icon, a "non envoyé" badge, and a dashed outline) and come back to life on the server when the network returns. Everything is encrypted on the phone, so the server stores data it cannot read.
+
+| Collecte: weighing offline | Collecte: a farmer's account | Carnet de route: driver at a stop | Carnet de route: owner view |
+|---|---|---|---|
+| ![A bundle weighed offline, marked "non envoyé"](docs/images/02-collecte-pesee-hors-ligne.png) | ![Weight per grade, gross amount, deductions, payments, balance](docs/images/04-collecte-producteur-solde.png) | ![A convoy wait in progress with the "Reprendre la route" button](docs/images/09-carnet-chauffeur-arret-en-cours.png) | ![Last reported place, expenses, advances, and stop times](docs/images/08-carnet-proprietaire-suivi.png) |
 
 Built for the Kiroween 2026 hackathon, **Skeleton Crew** category: one skeleton, two very different apps, built with TanStack Start.
 
@@ -16,7 +20,9 @@ Built for the Kiroween 2026 hackathon, **Skeleton Crew** category: one skeleton,
 - [Collecte: a cotton campaign with 41 farmers, about 50 t weighed, 3 truckloads, and 3 flags](https://collecte.abdrahamane.dev/#s=oSSQJhlPV5DvqdY7ma6NTQ&e=wot4_-EZQ1AJ4y2xX9PEebeLVsHedbeg-gqHC6IfY7U)
 - [Carnet de route: a finished Abidjan → Bamako trip and a Dakar trip waiting at Moussala](https://carnet.abdrahamane.dev/#s=KMgC9oz_yW5FTZzpj_gI2g&e=A2JBdogwhZuGgCkT-4hTBNwAHM0EmZWNYzZTNMDHMHg)
 
-To try recording data, open an app and create your own campaign or truck. Turn on airplane mode to see the ghosts 👻, then turn it off to watch them sync.
+To try recording data, open an app and create your own campaign or truck. Turn on airplane mode to see the ghost marks, then turn it off to watch them sync.
+
+The interface is in French, for its users. A few words: *producteur* farmer, *bâche* bundle of cotton, *pesée* weighing, *reçu* receipt, *retenue* deduction, *reste à payer* balance due, *chargement* truckload, *trajet* trip, *dépenses* expenses, *avance* cash advance, *arrêt* stop, *hors ligne* offline, *non envoyé* not sent yet, *à jour* up to date.
 
 ## The problem
 
@@ -69,7 +75,7 @@ TanStack Query is not used: the apps read from the phone, not from server querie
  │   │ save event + outbox (IndexedDB, 1 tx)│  push   │   stores envelopes in D1:          │
  │   ▼                                      ├────────►│   id, space, ts, device, iv, ct    │
  │ view = pure projection of all events     │  pull   │   never sees keys or contents      │
- │ 👻 = still in the outbox                 │◄────────┤   idempotent by event id           │
+ │ ghost mark = still in the outbox         │◄────────┤   idempotent by event id           │
  │ service worker: opens with no network    │ cursor  │                                    │
  └──────────────────────────────────────────┘         └────────────────────────────────────┘
 ```
@@ -112,19 +118,42 @@ npm test             # unit and property-based tests
 npm run typecheck
 npm run lint
 npm run build && npm run check:size
+npm run check:secrets  # no write links or API tokens in tracked files
 npm run seed:demo    # with the two apps running: a realistic cotton campaign and two truck trips
 ```
 
-Deployment to Cloudflare (free plan): [docs/deploy.md](docs/deploy.md). Building another app on the skeleton: [docs/new-app.md](docs/new-app.md).
+Deployment to Cloudflare (free plan): [docs/deploy.md](docs/deploy.md).
+
+## Start a new app
+
+```bash
+npm run new-app -- puits "Puits"
+npm run db:migrate:local -w @rezote/puits && npm run dev -w @rezote/puits
+```
+
+This creates `apps/puits` from [`templates/app`](templates/app): a small shared register that already works offline, shows ghost marks, syncs, shares write and read links, cancels with a reason, and has property tests. It gets a free port, the existing D1 database, its own accent color and icons, and joins the root build, type check, tests, and size check. Then you replace its events, projection, and screens: [docs/new-app.md](docs/new-app.md) walks through it with a third example app.
+
+CI generates a fresh app from the template on every push and type-checks, lints, tests, builds, and size-checks it, so a skeleton change that only works for the two shipped apps fails.
 
 ## How Kiro was used
 
-- **Spec-driven development.** [`.kiro/specs/rezote`](.kiro/specs/rezote) holds the requirements (testable acceptance criteria), the design (event model, sync protocol, encryption, projections, testing plan), and the task list. The spec went through several rounds: the app ideas changed after we judged them against "does missing network really hurt here?", field research changed the design (bundle-by-bundle weighing, factory gap, convoy waits, writers-only GPS), and the stack moved to TanStack Start with the sync API inside each app's Worker.
-- **Steering.** [`.kiro/steering`](.kiro/steering): `product.md` (users, tone, safety rules), `tech.md` (stack, size budget, integer money and weights, immutable events, server never reads payloads), `structure.md` (where code goes; the skeleton must not import apps).
-- **Hooks.** [`.kiro/hooks`](.kiro/hooks): run the unit and property tests when skeleton, domain, or API code is saved; check the money and ordering rules when a projection changes; build and enforce the size budget at the end of each agent turn.
+Everything was built in Kiro Web.
+
+- **Spec-driven development.** [`.kiro/specs/rezote`](.kiro/specs/rezote) holds the requirements (testable acceptance criteria), the design (event model, sync protocol, encryption, projections, testing plan), and the task list. The spec went through several rounds: the app ideas changed after we judged them against "does missing network really hurt here?", field research changed the design (bundle-by-bundle weighing, factory gap, convoy waits, writers-only GPS), and the stack moved to TanStack Start with the sync API inside each app's Worker. A second spec, [`.kiro/specs/new-app-command`](.kiro/specs/new-app-command), was written before the new-app command and its CI job.
+- **Steering** in [`.kiro/steering`](.kiro/steering), with three inclusion modes:
+  - always: `product.md` (users, tone, safety rules), `tech.md` (stack, size budget, integer money and weights, immutable events, server never reads payloads), `structure.md` (where code goes; the skeleton must not import apps);
+  - file match: `ui.md` (interface rules), loaded only when a screen, component, or theme file is in context;
+  - auto: `field-facts.md`, which pulls in `docs/research.md` (sourced prices, roads, practices) when demo data, presets, or figures are being written.
+- **Hooks** in [`.kiro/hooks`](.kiro/hooks):
+  - run the unit and property tests when skeleton, domain, or API code is saved;
+  - remind the agent of the money and ordering rules when a projection changes;
+  - build every app and enforce the size budget at the end of each agent turn;
+  - before any `git commit` or `git push`, block the command if a demo write link or an API token would enter the repository. Both pass through sessions during deploys and live tests. The same check (`npm run check:secrets`) runs in CI.
+- **Skill.** [`.kiro/skills/new-rezote-app`](.kiro/skills/new-rezote-app/SKILL.md) takes an idea to a deployed app. It first checks that the idea is really an offline problem and which fields must stay writers-only, then runs the command, replaces the domain, adds property tests, writes the screens, and runs the checks.
+- **Custom agent.** [`.kiro/agents/field-reviewer.md`](.kiro/agents/field-reviewer.md) is a read-only reviewer. It checks screens against field conditions: offline actions, ghost marks, read-only links, no deletion, integer money, plain French, 40 px touch targets, and sourced figures. Its first run on the starter app found a double-submit risk, English validation messages, and an amount limit missing from the form, and all three were fixed in the template.
 - **Property-based testing** with fast-check: order and duplicate invariance of every projection, merge laws, "no event is ever lost" against a server that fails and loses responses at random, encryption round trip and tamper detection, read keys cannot open writers-only fields, rounding per farmer, store and balance identities, cancellation equals never recorded, stop times never negative, and format round trips.
-- **MCP.** Context7 for current documentation of TanStack Start (SPA mode, server routes) and Cloudflare Workers (rate limiting, TanStack Start deployment, bindings).
-- **End-to-end checks.** A headless browser played four phones against the real Workers and local D1: offline weighing with ghosts, reconnect and sync, read-only links, offline reload through the service worker, and a database that contains no clear text.
+- **MCP and powers.** The Context7 MCP server supplied current documentation for TanStack Start (SPA mode, server routes) and Cloudflare Workers (rate limiting, TanStack Start deployment, bindings). The GitHub CLI power handled pull requests and repository settings from the sandbox.
+- **End-to-end checks.** A headless browser played four phones against the real Workers and local D1: offline weighing with ghosts, reconnect and sync, read-only links, offline reload through the service worker, and a database that contains no clear text. The same kind of test ran on an app generated by the new-app command (18 checks).
 
 ## Project structure
 
@@ -134,9 +163,10 @@ packages/core/       skeleton: events, crypto, storage, sync, runtime, formats, 
 packages/sync-api/   sync API handlers (framework-free) and D1 migrations
 apps/collecte/       app 1: src/domain (pure, tested), src/routes (TanStack Router), wrangler.jsonc
 apps/carnet-de-route/  app 2
-scripts/             size budget, service worker, icons, demo seed
-docs/                research, deployment, new app guide
-.kiro/               specs, steering, hooks
+templates/app/       starter app copied by npm run new-app
+scripts/             new app, size budget, secrets check, service worker, icons, demo seed
+docs/                research, deployment, new app guide, screenshots
+.kiro/               specs, steering, hooks, skills, agents
 ```
 
 ## License
