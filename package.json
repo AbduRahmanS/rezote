@@ -9,10 +9,12 @@
   "scripts": {
     "dev:collecte": "npm run dev -w @rezote/collecte",
     "dev:route": "npm run dev -w @rezote/carnet-de-route",
-    "build": "npm run build -w @rezote/collecte && npm run build -w @rezote/carnet-de-route",
-    "check:size": "node scripts/check-size.mjs apps/collecte/dist/client apps/carnet-de-route/dist/client",
-    "typecheck": "tsc -p packages/ui && tsc -p packages/core && tsc -p packages/sync-api && tsc -p apps/collecte && tsc -p apps/carnet-de-route && tsc -p scripts",
+    "build": "npm run build --workspaces --if-present",
+    "check:size": "node scripts/check-size.mjs",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p scripts",
     "icons": "node scripts/make-icons.mjs",
+    "new-app": "node scripts/new-app.mjs",
+    "check:secrets": "node scripts/check-secrets.mjs",
     "lint": "eslint .",
     "test": "vitest --run",
     "seed:demo": "tsx scripts/seed-demo.ts"

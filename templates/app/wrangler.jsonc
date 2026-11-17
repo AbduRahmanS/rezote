@@ -1,0 +1,28 @@
+// __NAME__: one Cloudflare Worker serves the app (TanStack Start, SPA mode) and the sync API under /api.
+// See docs/deploy.md.
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "rezote-__SLUG__",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // src/server.ts: serves the SPA shell with security headers, /api to the sync API.
+  "main": "./src/server.ts",
+  // The Worker reads the prerendered shell through this binding.
+  "assets": { "binding": "ASSETS" },
+  "observability": { "enabled": true },
+  // Served on workers.dev for now. For a custom domain, set "workers_dev": false and add
+  // "routes": [{ "pattern": "<app>.<your domain>", "custom_domain": true }]. Keep a single
+  // origin per app: data is stored per origin on the phone.
+  "workers_dev": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "rezote",
+      // The database shared by all apps (see docs/deploy.md).
+      "database_id": "__DATABASE_ID__",
+      "migrations_dir": "../../packages/sync-api/migrations"
+    }
+  ],
+  // 60 writes per minute per IP, per Cloudflare location.
+  "ratelimits": [{ "name": "WRITE_LIMITER", "namespace_id": "1001", "simple": { "limit": 60, "period": 60 } }]
+}

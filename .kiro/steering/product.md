@@ -5,7 +5,7 @@ Rezote (from Bambara *rezo tɛ*, "no network") is a template for web apps that k
 - **Collecte**: cotton weighing at village sessions, one bundle (*bâche*) at a time, replacing the three paper notebooks. The cooperative treasurer sees weights, gross amounts, deductions (fertilizer on credit), payments, balances, and the gap between village and factory weights.
 - **Carnet de route**: a truck driver logs fuel, fees, stops, and incidents on the Dakar–Bamako and Abidjan–Bamako corridors; the owner follows the trip and its costs.
 
-Background facts and sources: `docs/research.md`. Check it before inventing figures.
+Background facts and sources: `docs/research.md` (loaded through `field-facts.md` when figures are needed). Never invent figures.
 
 ## Users and context
 
@@ -21,6 +21,6 @@ Background facts and sources: `docs/research.md`. Check it before inventing figu
 ## Interface rules
 
 - All interface text is in French.
-- Every action must work offline and show a ghost (👻) until it reaches the server.
+- Every action must work offline and show a ghost mark ("non envoyé") until it reaches the server.
 - Never delete data: corrections are cancellation events with a reason.
-- Large touch targets (at least 44 px), high contrast, no web fonts.
+- Large touch targets (at least 40 px), high contrast, no web fonts. Details in `ui.md`.

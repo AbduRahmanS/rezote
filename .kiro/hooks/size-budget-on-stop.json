@@ -2,7 +2,7 @@
   "version": "v1",
   "hooks": [
     {
-      "name": "Build both apps and enforce the 150 KB first-load budget at the end of each agent turn",
+      "name": "Build every app and enforce the 300 KB first-load budget at the end of each agent turn",
       "trigger": "Stop",
       "action": {
         "type": "command",

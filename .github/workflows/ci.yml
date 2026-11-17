@@ -17,8 +17,28 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run check:secrets
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
       - run: npm run build
       - run: npm run check:size
+
+  # Generates a fresh app from templates/app and checks it like the shipped ones,
+  # so a skeleton change that only works for Collecte and Carnet de route fails here.
+  starter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run new-app -- ci-starter "Démo" --no-install
+      - run: npm install --no-audit --no-fund
+      - run: npm run typecheck -w @rezote/ci-starter
+      - run: npx eslint apps/ci-starter
+      - run: npx vitest --run apps/ci-starter
+      - run: npm run build -w @rezote/ci-starter
+      - run: node scripts/check-size.mjs apps/ci-starter/dist/client

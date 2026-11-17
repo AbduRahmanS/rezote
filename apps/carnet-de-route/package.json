@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "description": "Carnet de route: truck trip log for West African corridors, offline-first",
+  "rezote": {
+    "accent": "#2dd4bf"
+  },
   "scripts": {
     "dev": "vite dev",
     "build": "vite build && node ../../scripts/build-sw.mjs dist/client",

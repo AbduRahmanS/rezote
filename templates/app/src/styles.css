@@ -1,0 +1,15 @@
+@import "@rezote/ui/globals.css";
+@source "./";
+
+/* __NAME__: accent color. Change the hue (0 to 360) to recolor the app. */
+:root {
+  --primary: oklch(0.5 0.15 __HUE__);
+  --primary-foreground: oklch(0.985 0.01 __HUE__);
+  --ring: oklch(0.5 0.15 __HUE__ / 0.45);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: oklch(0.76 0.12 __HUE__);
+    --primary-foreground: oklch(0.2 0.04 __HUE__);
+  }
+}
